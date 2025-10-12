@@ -1,0 +1,64 @@
+<div class="card tolobars">
+    <p-toolbar>
+        <ng-template #start>
+            <p-button icon="pi pi-plus" class="mr-2" severity="secondary"/> 
+            <p-button icon="pi pi-print" class="mr-2"  severity="secondary" /> 
+            <p-button icon="pi pi-upload"  severity="secondary" /> 
+        </ng-template>
+        <ng-template #center>
+            <p-iconfield iconPosition="left">
+                <p-inputicon class="pi pi-search" />
+                <input type="text" pInputText placeholder="Search" />
+            </p-iconfield>
+        </ng-template>
+        <ng-template #end>
+            <p-splitbutton label="Save" [model]="items" />
+        </ng-template>
+    </p-toolbar>
+</div>
+
+<div class="flexdiv">
+
+    <p-menu [model]="items" class="flex justify-center" styleClass="w-full md:w-60">
+        <ng-template #start>
+            <span class="inline-flex items-center gap-1 px-2 py-2">
+                 <svg
+                    width="31"
+                    height="33"
+                    viewBox="0 0 31 33"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="block mx-auto"
+                >
+                </svg>
+                <span class="text-xl font-semibold">PRIME<span class="text-primary">APP</span></span>
+            </span>
+        </ng-template>
+        <ng-template #submenuheader let-item>
+            <span class="text-primary font-bold">{{ item.label }}</span>
+        </ng-template>
+        <ng-template #item let-item>
+            <a pRipple class="flex items-center p-menu-item-link">
+                <span [class]="item.icon"></span>
+                <span class="ml-2">{{ item.label }}</span>
+                <p-badge *ngIf="item.badge" class="ml-auto" [value]="item.badge" />
+                <span *ngIf="item.shortcut" class="ml-auto border border-surface rounded bg-emphasis text-muted-color text-xs p-1">{{ item.shortcut }}</span>
+            </a>
+        </ng-template>
+        <ng-template #end>
+            <button pRipple class="relative overflow-hidden w-full border-0 bg-transparent flex items-start p-2 pl-4 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-none cursor-pointer transition-colors duration-200">
+                <p-avatar image="https://primefaces.org/cdn/primeng/images/demo/avatar/amyelsner.png" class="mr-2" shape="circle" />
+                <span class="inline-flex flex-col">
+                    <span class="font-bold">Amy Elsner</span>
+                    <span class="text-sm">Admin</span>
+                </span>
+            </button>
+        </ng-template>
+    </p-menu>
+
+
+<div class="card flex flex-col padcar" >
+    <ng-content></ng-content>
+</div>
+
+</div>
