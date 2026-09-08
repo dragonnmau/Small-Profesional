@@ -1,0 +1,34 @@
+.tax-page {
+	--ink: #19324a; --muted: #718096; --line: #dce6ea; --paper: #fff; --wash: #f4f8f7; --teal: #117c78;
+	min-height: 100%; padding: 2.5rem clamp(1.25rem, 4vw, 4rem) 4rem; color: var(--ink);
+	background: linear-gradient(135deg, #f1f7f5 0%, #f8f5ef 55%, #f3f6fb 100%);
+}
+.page-heading { margin-bottom: 1.75rem; }
+.eyebrow { margin: 0 0 .35rem; color: var(--teal); font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: .4rem; font-size: clamp(1.8rem, 3vw, 2.8rem); letter-spacing: -.03em; } h2 { margin-bottom: 0; font-size: 1.25rem; }
+.intro, .settings-copy p:last-child { margin-bottom: 0; color: var(--muted); }
+.settings-panel, .calculators { display: grid; gap: 1.25rem; }
+.settings-panel { grid-template-columns: minmax(12rem, .8fr) 1.7fr; align-items: center; margin-bottom: 1.5rem; padding: 1.35rem 1.5rem; border: 1px solid #c9dfda; border-radius: 8px; background: rgba(255,255,255,.8); box-shadow: 0 12px 28px rgba(32,67,72,.06); }
+.settings-copy p:last-child { font-size: .82rem; line-height: 1.5; }
+.settings-fields { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
+label { display: grid; gap: .4rem; color: var(--muted); font-size: .78rem; font-weight: 700; }
+input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 5px; padding: .7rem .75rem; color: var(--ink); background: var(--paper); font: inherit; font-weight: 500; }
+input:focus { outline: 2px solid rgba(17,124,120,.22); border-color: var(--teal); }
+.settings-fields label { width: 7.5rem; }
+.save-button { border: 0; border-radius: 5px; padding: .72rem 1rem; color: #fff; background: var(--teal); font: inherit; font-size: .78rem; font-weight: 800; cursor: pointer; }
+.save-button:hover { background: #0c6562; } .saved-message { align-self: center; color: var(--teal); font-size: .76rem; font-weight: 700; }
+.calculators { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: start; }
+.calculator-card { min-width: 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 16px 32px rgba(31,54,66,.07); }
+.moral-card { border-top: 4px solid #df8d45; } .fisica-card { border-top: 4px solid var(--teal); }
+.card-heading { display: flex; gap: .8rem; align-items: flex-start; margin-bottom: 1.75rem; } .card-number { color: #c5d1d0; font-size: 1.45rem; font-weight: 800; line-height: 1; }
+.amount-field { position: relative; margin-bottom: 1.3rem; } .amount-field input { padding-left: 2rem; font-size: 1.1rem; } .input-prefix { position: absolute; left: .75rem; bottom: .73rem; color: var(--teal); font-weight: 800; }
+.retention-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.3rem; }
+.retention-fields label { position: relative; }
+.retention-fields input { padding-left: 1.8rem; }
+.result-list { margin: 0; border-top: 1px solid var(--line); } .result-list div { display: flex; justify-content: space-between; gap: 1rem; padding: .9rem 0; border-bottom: 1px solid var(--line); }
+dt { color: var(--muted); font-size: .82rem; } dd { margin: 0; font-weight: 800; } .result-total dt, .result-total dd { color: var(--ink); font-size: 1rem; }
+.formula-note { margin: 1rem 0 0; color: var(--muted); font-size: .75rem; } .sub-calculators { display: grid; gap: 1.25rem; } .sub-calculator { padding: 1rem; border: 1px solid var(--line); background: var(--wash); }
+.sub-heading { display: flex; gap: .55rem; align-items: center; margin-bottom: 1.1rem; } .sub-heading span { color: var(--teal); font-size: .7rem; font-weight: 800; } .sub-heading h3 { margin: 0; font-size: .95rem; } .compact-list div { padding: .7rem 0; }
+@media (max-width: 780px) { .settings-panel, .calculators { grid-template-columns: 1fr; } .settings-fields { align-items: stretch; } .settings-fields label { flex: 1 1 7rem; } .save-button { align-self: end; } }
+@media (max-width: 460px) { .tax-page { padding: 1.5rem 1rem 3rem; } .settings-panel, .calculator-card { padding: 1rem; } .settings-fields label, .save-button { width: 100%; flex-basis: 100%; } }
+@media (max-width: 460px) { .retention-fields { grid-template-columns: 1fr; } }

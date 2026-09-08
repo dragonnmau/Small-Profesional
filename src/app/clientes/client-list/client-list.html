@@ -1,0 +1,139 @@
+<section class="clients-page">
+  <header class="clients-header">
+    <div>
+      <h2>Clientes</h2>
+      <p>Administra clientes y empresas registradas.</p>
+    </div>
+    <div class="header-actions"><button class="primary-button" type="button" (click)="openNew('Cliente')"><i
+          class="pi pi-plus"></i> Crear cliente</button></div>
+  </header>
+  <div class="summary">
+    <div><i class="pi pi-users"></i><span><strong>{{ activeClients }}</strong> clientes activos</span></div>
+    <div><i class="pi pi-building"></i><span><strong>{{ clients.length }}</strong> registros totales</span></div>
+  </div>
+  <div class="clients-card">
+    <div class="card-tools">
+      <div class="search-box"><i class="pi pi-search"></i><input type="search" [(ngModel)]="search"
+          placeholder="Buscar cliente, contacto o correo"></div><span>{{ filteredClients.length }} resultado(s)</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente / empresa</th>
+            <th>Razon social</th>
+            <th>Contacto</th>
+            <th>Telefono</th>
+            <th>Correo electronico</th>
+            <th>Empresas ligadas</th>
+            <th>Estatus</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let client of filteredClients" [class.inactive]="client.status === 'Baja'">
+            <td><strong>{{ client.name }}</strong><small><i class="pi" [class.pi-user]="client.kind === 'Cliente'"
+                  [class.pi-building]="client.kind === 'Empresa'"></i> {{ client.kind }}</small></td>
+            <td>{{ client.businessName || '—' }}</td>
+            <td>{{ client.contact || '—' }}</td>
+            <td>{{ client.phone || '—' }}</td>
+            <td>{{ client.email || '—' }}</td>
+            <td>
+              <div class="row-actions">
+                <span class="linked-count">{{ companiesFor(client.id).length }}</span><button class="row-link-button"
+                  type="button" (click)="openLinkedCompanies(client)" title="Ver empresas ligadas"><i class="pi pi-eye"></i></button><button class="reactivate"
+                  type="button" (click)="openCompanyForm(client)" title="Agregar Empresa"><i class="pi pi-building"></i></button>
+              </div>  
+            </td>
+            <td><span class="status" [class.inactive-status]="client.status === 'Baja'">{{ client.status }}</span></td>
+            <td>
+              <div class="row-actions"><button type="button" title="Editar" (click)="openEdit(client)"><i
+                    class="pi pi-pencil"></i></button><button type="button"
+                  [class.reactivate]="client.status === 'Baja'"
+                  [title]="client.status === 'Activo' ? 'Dar de baja' : 'Reactivar'" (click)="toggleStatus(client)"><i
+                    class="pi" [class.pi-user-minus]="client.status === 'Activo'"
+                    [class.pi-user-plus]="client.status === 'Baja'"></i></button></div>
+            </td>
+          </tr>
+          <tr *ngIf="!filteredClients.length">
+            <td colspan="8" class="empty-state">No se encontraron clientes.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<div class="modal-backdrop" *ngIf="isFormOpen" (click)="closeForm()">
+  <section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h3>{{ editingClientId === null ? (formKind === 'Empresa' ? 'Agregar empresa' : 'Crear cliente') : 'Editar ' +
+          formKind.toLowerCase() }}</h3>
+        <p>Completa la informacion fiscal y de contacto.</p>
+      </div><button class="icon-button" type="button" aria-label="Cerrar" (click)="closeForm()"><i
+          class="pi pi-times"></i></button>
+    </header>
+    <form (ngSubmit)="saveClient()">
+      <div class="form-grid"><label>Nombre {{ formKind }}<input name="name" [(ngModel)]="clientForm.name"
+            required></label><label>Razon social<input name="businessName"
+            [(ngModel)]="clientForm.businessName"></label></div>
+      <div class="form-grid three"><label>RFC<input name="rfc" [(ngModel)]="clientForm.rfc" minlength="12" maxlength="13" pattern="[A-Za-z0-9]{12,13}" autocomplete="off" style="text-transform: uppercase" placeholder="Ej. ABC010203AB1"></label><label>Regimen fiscal<select name="taxRegime" [(ngModel)]="clientForm.taxRegime" required><option value="" disabled>Selecciona un regimen fiscal</option><option *ngFor="let regime of taxRegimes" [value]="regime.name">{{ regime.satCode }} - {{ regime.name }}</option></select></label><label>Codigo postal<input name="postalCode"
+            [(ngModel)]="clientForm.postalCode" inputmode="numeric"></label></div><label>Direccion<textarea
+          name="address" [(ngModel)]="clientForm.address" rows="2"></textarea></label>
+      <div class="form-grid three"><label>Contacto<input name="contact"
+            [(ngModel)]="clientForm.contact"></label><label>Numero telefonico<input name="phone"
+            [(ngModel)]="clientForm.phone" type="tel"></label><label>Correo electronico<input name="email"
+            [(ngModel)]="clientForm.email" type="email"></label></div>
+      <footer><button class="secondary-button" type="button" (click)="closeForm()">Cancelar</button><button
+          class="primary-button" type="submit">{{ editingClientId === null ? 'Guardar' : 'Guardar cambios' }}</button>
+      </footer>
+    </form>
+  </section>
+</div>
+<div class="modal-backdrop" *ngIf="isLinkedCompaniesOpen" (click)="closeLinkedCompanies()">
+  <section class="modal linked-companies-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h3>Empresas ligadas</h3>
+        <p>{{ selectedClient?.name }}</p>
+      </div><button class="icon-button" type="button" aria-label="Cerrar" (click)="closeLinkedCompanies()"><i
+          class="pi pi-times"></i></button>
+    </header>
+    <div class="linked-companies-list" *ngIf="selectedClient as client">
+      <article class="linked-company" *ngFor="let company of companiesFor(client.id)">
+        <div class="linked-company-heading"><i class="pi pi-building"></i><strong>{{ company.name }}</strong><button class="icon-button" type="button" title="Editar empresa ligada" aria-label="Editar empresa ligada" (click)="openCompanyEdit(company)"><i class="pi pi-pencil"></i></button></div>
+        <dl>
+          <div><dt>Razon social</dt><dd>{{ company.businessName || '—' }}</dd></div>
+          <div><dt>Contacto</dt><dd>{{ company.contact || '—' }}</dd></div>
+          <div><dt>Telefono</dt><dd>{{ company.phone || '—' }}</dd></div>
+          <div><dt>Correo electronico</dt><dd>{{ company.email || '—' }}</dd></div>
+        </dl>
+      </article>
+      <p class="empty-state" *ngIf="!companiesFor(client.id).length">Este cliente no tiene empresas ligadas.</p>
+    </div>
+    <footer><button class="secondary-button" type="button" (click)="closeLinkedCompanies()">Cerrar</button><button
+      class="primary-button" type="button" (click)="addLinkedCompany()">Agregar empresa</button></footer>
+  </section>
+</div>
+<div class="modal-backdrop" *ngIf="isCompanyFormOpen" (click)="closeCompanyForm()">
+  <section class="modal company-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h3>{{ editingCompanyId === null ? 'Agregar empresa ligada' : 'Editar empresa ligada' }}</h3>
+        <p>Empresa relacionada con {{ selectedClient?.name }}.</p>
+      </div><button class="icon-button" type="button" aria-label="Cerrar" (click)="closeCompanyForm()"><i
+          class="pi pi-times"></i></button>
+    </header>
+    <form (ngSubmit)="saveCompany()">
+      <div class="form-grid"><label>Nombre empresa<input name="companyName" [(ngModel)]="companyForm.name"
+            required></label><label>Razon social<input name="companyBusinessName"
+            [(ngModel)]="companyForm.businessName"></label></div>
+      <div class="form-grid three"><label>Contacto<input name="companyContact"
+            [(ngModel)]="companyForm.contact"></label><label>Numero telefonico<input name="companyPhone"
+            [(ngModel)]="companyForm.phone" type="tel"></label><label>Correo electronico<input name="companyEmail"
+            [(ngModel)]="companyForm.email" type="email"></label></div>
+      <footer><button class="secondary-button" type="button" (click)="closeCompanyForm()">Cancelar</button><button
+          class="primary-button" type="submit">{{ editingCompanyId === null ? 'Guardar empresa' : 'Guardar cambios' }}</button></footer>
+    </form>
+  </section>
+</div>

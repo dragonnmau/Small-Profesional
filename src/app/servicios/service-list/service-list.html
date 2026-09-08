@@ -1,0 +1,159 @@
+<section class="service-page">
+  <header class="service-header">
+    <div>
+      <h2>Lista de servicios</h2>
+      <p>Consulta y administra los servicios del mes seleccionado.</p>
+    </div><div class="header-actions"><button class="secondary-button" type="button" (click)="openExport()"><i class="pi pi-download"></i> Exportar</button><button class="primary-button" type="button" (click)="openForm()"><i class="pi pi-plus"></i> Agregar
+      servicio</button></div>
+  </header>
+  <section class="calendar-card">
+    <div class="calendar-title">
+      <div>
+        <h3>Calendario de servicios</h3>
+        <p>{{ calendarTitle }}</p>
+      </div><label>Mes<input type="month" [(ngModel)]="selectedMonth"></label>
+    </div>
+    <div class="weekdays">
+      <span>Lun</span><span>Mar</span><span>Mie</span><span>Jue</span><span>Vie</span><span>Sab</span><span>Dom</span>
+    </div>
+    <div class="calendar-grid">
+      <div class="calendar-day" *ngFor="let cell of calendarDays" [class.blank]="!cell"><ng-container
+          *ngIf="cell"><strong>{{ cell.day }}</strong><button class="calendar-service"
+            *ngFor="let service of cell.services" type="button" [class.completed]="service.status === 'Completado'"
+            [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'" [class.pending]="service.status === 'Pendiente'" (click)="openEditForm(service)"
+            [title]="service.client">{{ service.time }} · {{ service.folio || service.client }}</button></ng-container></div>
+    </div>
+    <p class="calendar-note"><i class="pi pi-info-circle"></i> Selecciona un servicio en el calendario para editarlo.
+    </p>
+  </section>
+  <div class="service-card">
+    <div class="card-tools">
+      <div class="search-box"><i class="pi pi-search"></i><input type="search" [(ngModel)]="search"
+          placeholder="Buscar por folio, cliente o ciudad"></div><span>{{ filteredServices.length }} servicio(s) en {{
+        calendarTitle }}</span>
+    </div>
+    <div class="service-filters">
+      <label>Cliente<select name="listClientId" [(ngModel)]="selectedClientId" (ngModelChange)="onServiceListClientChange()"><option [ngValue]="null">Todos los clientes</option><option *ngFor="let client of clients" [ngValue]="client.id">{{ client.name }}</option></select></label>
+      <label>Empresa<select name="listCompanyId" [(ngModel)]="selectedCompanyId" [disabled]="selectedClientId === null"><option [ngValue]="null">Todas las empresas</option><option *ngFor="let company of serviceListCompanies" [ngValue]="company.id">{{ company.name }}</option></select></label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Fecha</th>
+            <th>Cliente / sitio</th>
+            <th>Ciudad</th>
+            <th>Descripcion</th>
+            <th>Estatus</th>
+            <th class="amount">Costo final</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let service of filteredServices">
+            <td><strong>{{ service.folio || 'Sin folio' }}</strong></td>
+            <td>{{ service.date | date:'dd/MM/yyyy' }}</td>
+            <td><strong>{{ service.client }}</strong><small>{{ service.site || 'Sin sitio registrado' }}</small></td>
+            <td>{{ service.city || '—' }}</td>
+            <td class="description">{{ service.description || '—' }}</td>
+            <td><span class="status" [class.completed]="service.status === 'Completado'"
+                [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'">{{ service.status }}</span></td>
+            <td class="amount total">{{ totalFor(service) | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            <td>
+              <div class="row-actions"><button type="button" title="Editar servicio" (click)="openEditForm(service)"><i
+                    class="pi pi-pencil"></i></button><button class="delete" type="button" title="Eliminar servicio"
+                  (click)="deleteService(service)"><i class="pi pi-trash"></i></button></div>
+            </td>
+          </tr>
+          <tr *ngIf="!filteredServices.length">
+            <td colspan="8" class="empty-state">No hay servicios registrados para este mes.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="monthly-total"><span>Total aprox del mes</span><strong>{{ monthApproxTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></div>
+  </div>
+</section>
+<div class="modal-backdrop" *ngIf="isFormOpen" (click)="closeForm()">
+  <section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h3>{{ editingServiceId === null ? 'Agregar servicio' : 'Editar servicio' }}</h3>
+        <p>Captura la informacion y los costos del servicio.</p>
+      </div><button class="icon-button" type="button" aria-label="Cerrar" (click)="closeForm()"><i
+          class="pi pi-times"></i></button>
+    </header>
+    <form (ngSubmit)="saveService()">
+      <div class="form-grid three"><label>Fecha<input type="date" name="date" [(ngModel)]="serviceForm.date"
+        required></label><label>Hora<input type="time" name="time" [(ngModel)]="serviceForm.time" required></label><label>Folio de servicio <small>(opcional)</small><input name="folio"
+            [(ngModel)]="serviceForm.folio" placeholder="Ej. SER-0003"></label><label>Estatus<select name="status" [(ngModel)]="serviceForm.status">
+            <option>Completado</option>
+            <option>Cancelado en transito</option>
+            <option>Cancelado</option>
+            <option>Pendiente</option>
+          </select></label><label>Servicio pagado<select name="servicePaid" [(ngModel)]="serviceForm.servicePaid"><option>Si</option><option>No</option></select></label></div>
+      <div class="form-grid three"><label>Cliente<select name="clientId" [(ngModel)]="serviceForm.clientId"
+        (ngModelChange)="onClientChange()" required><option [ngValue]="null">Selecciona un cliente</option><option
+          *ngFor="let client of clients" [ngValue]="client.id">{{ client.name }}{{ client.businessName ? ' · ' + client.businessName : '' }}</option></select></label><label>Empresa<select name="companyId" [(ngModel)]="serviceForm.companyId" [disabled]="serviceForm.clientId === null"><option [ngValue]="null">Sin empresa ligada</option><option *ngFor="let company of availableCompanies" [ngValue]="company.id">{{ company.name }}</option></select></label><label>Ciudad<input name="city"
+        list="service-cities" [(ngModel)]="serviceForm.city"><datalist id="service-cities"><option *ngFor="let city of cities" [value]="city"></option></datalist></label></div><label>Sitio<input name="site" [(ngModel)]="serviceForm.site"
+          placeholder="Ubicacion o area de atencion"></label><label>Descripcion<textarea name="description"
+          [(ngModel)]="serviceForm.description" rows="2"></textarea></label>
+      <h4>Costos</h4>
+      <div class="form-grid three"><label>Costo de servicio<input type="number" min="0" step="0.01" name="serviceCost"
+            [(ngModel)]="serviceForm.serviceCost"></label><label>Viatico<input type="number" min="0" step="0.01"
+            name="travelAllowance" [(ngModel)]="serviceForm.travelAllowance"></label><label>Viatico depositado<select
+            name="travelDeposit" [(ngModel)]="serviceForm.travelDeposit">
+            <option>Si</option>
+            <option>No</option>
+            <option>N/A</option>
+          </select></label></div>
+      <div class="materials">
+        <div class="materials-head">
+          <div>
+            <h4>Materiales</h4><small>Agrega los materiales utilizados y su costo.</small>
+          </div><button type="button" class="outline-button" (click)="addMaterial()"><i class="pi pi-plus"></i> Agregar
+            material</button>
+        </div>
+        <div class="material-row" *ngFor="let material of serviceForm.materials; let i = index"><input
+          [name]="'materialName' + i" list="service-materials" [(ngModel)]="material.name" placeholder="Nombre del material"><input
+            type="number" min="0" step="0.01" [name]="'materialCost' + i" [(ngModel)]="material.cost"
+            (ngModelChange)="updateMaterialsCost()" placeholder="Costo"><button type="button" class="remove-button"
+            (click)="removeMaterial(i)" aria-label="Quitar material"><i class="pi pi-trash"></i></button></div>
+        <datalist id="service-materials"><option *ngFor="let materialName of materialNames" [value]="materialName"></option></datalist>
+        <div class="materials-total">Costo de materiales <strong>{{ serviceForm.materialsCost |
+            currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></div>
+      </div>
+      <div class="form-grid three"><label>Costo de transporte<input type="number" min="0" step="0.01" name="transportCost"
+        [(ngModel)]="serviceForm.transportCost"></label><label>Costo de gasolina<input type="number" min="0" step="0.01" name="gasolineCost"
+        [(ngModel)]="serviceForm.gasolineCost"></label>
+        <div class="cost-totals">
+          <div class="final-total secondary-total"><span>Total sin costo de servicio</span><strong>{{
+              formCostsWithoutService | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></div>
+          <div class="final-total"><span>Sumatoria de costos finales</span><strong>{{ formTotal |
+              currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></div>
+        </div>
+      </div>
+      <footer><button class="secondary-button" type="button" (click)="closeForm()">Cancelar</button><button
+          class="primary-button" type="submit">{{ editingServiceId === null ? 'Guardar servicio' : 'Guardar cambios'
+          }}</button></footer>
+    </form>
+  </section>
+</div>
+<div class="modal-backdrop" *ngIf="isExportOpen" (click)="closeExport()">
+  <section class="modal export-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header>
+      <div><h3>Exportar servicios</h3><p>Selecciona los registros y costos que deseas incluir en Excel.</p></div>
+      <button class="icon-button" type="button" aria-label="Cerrar" (click)="closeExport()"><i class="pi pi-times"></i></button>
+    </header>
+    <form (ngSubmit)="exportServices()">
+      <div class="form-grid three">
+        <label>Mes<select name="exportMonth" [(ngModel)]="exportMonth"><option value="all">Todos los meses</option><option *ngFor="let month of exportMonths" [value]="month">{{ month }}</option></select></label>
+        <label>Cliente<select name="exportClientId" [(ngModel)]="exportClientId" (ngModelChange)="onExportClientChange()"><option [ngValue]="null">Todos los clientes</option><option *ngFor="let client of clients" [ngValue]="client.id">{{ client.name }}</option></select></label>
+        <label>Empresa<select name="exportCompanyId" [(ngModel)]="exportCompanyId" [disabled]="exportClientId === null"><option [ngValue]="null">Todas las empresas</option><option *ngFor="let company of exportCompanies" [ngValue]="company.id">{{ company.name }}</option></select></label>
+      </div>
+      <fieldset class="export-fields"><legend>Campos de costos</legend><label *ngFor="let field of exportCostFields" class="check-option"><input type="checkbox" [checked]="exportFields[field.key]" (change)="setExportField(field.key, $any($event.target).checked)"> {{ field.label }}</label></fieldset>
+      <footer><button class="secondary-button" type="button" (click)="closeExport()">Cancelar</button><button class="primary-button" type="submit" [disabled]="!canExport"><i class="pi pi-download"></i> Exportar Excel</button></footer>
+    </form>
+  </section>
+</div>

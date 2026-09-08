@@ -1,1 +1,37 @@
-<p>calendar works!</p>
+<div class="card">
+	<div class="card-header">
+		<div class="title">
+			<button class="nav" (click)="prevMonth()">‹</button>
+			<h3>{{ viewMonth | date:'MMMM yyyy' }}</h3>
+			<button class="nav" (click)="nextMonth()">›</button>
+		</div>
+		<div class="current-date">Hoy: {{ currentDate | date:'fullDate' }}</div>
+	</div>
+	<div class="card-body">
+		<div class="calendar-container">
+			<div class="week-days"><div *ngFor="let d of weekDayNames" class="weekday">{{ d }}</div></div>
+			<div class="weeks">
+				<div class="week" *ngFor="let week of weeks">
+					<div class="day" *ngFor="let day of week" [class.other-month]="!day.inMonth" [class.today]="day.isToday" (click)="selectDate(day.date)">
+						<div class="daynum">{{ day.date.getDate() }}</div>
+						<div class="day-events"><div *ngFor="let e of getEventsForDate(day.date); let i = index" class="event" [title]="e.title"><span *ngIf="i < 2">• {{ e.title }}</span><span *ngIf="i === 2">... ({{ getEventsForDate(day.date).length - 2 }})</span></div></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<section class="event-card" aria-labelledby="event-form-title">
+	<form class="event-form" (ngSubmit)="addEvent()">
+		<h3 id="event-form-title" class="form-title">Agregar evento</h3>
+		<label class="field"><span>Fecha del evento</span><input type="date" name="date" [(ngModel)]="selectedDateStr" required class="event-input" /></label>
+		<label class="field"><span>Hora</span><input type="time" name="time" [(ngModel)]="newEventTime" required class="event-input" /></label>
+		<label class="field field-wide"><span>Título del evento</span><input type="text" name="title" [(ngModel)]="newEventTitle" required class="event-input" /></label>
+		<label class="field field-wide"><span>Descripción</span><textarea name="description" [(ngModel)]="newEventDescription" class="event-input"></textarea></label>
+		<label class="field"><span>Cliente</span><input type="text" name="client" [(ngModel)]="newEventClient" class="event-input" /></label>
+		<label class="field"><span>Sitio a acudir</span><input type="text" name="site" [(ngModel)]="newEventSite" class="event-input" /></label>
+		<div class="form-actions"><button type="submit" class="btn-add">Guardar evento</button></div>
+	</form>
+	<div class="events" *ngIf="events.length"><h4>Eventos programados</h4><ul><li *ngFor="let e of events"><strong>{{ e.date }} {{ e.time }} — {{ e.title }}</strong><span *ngIf="e.client">{{ e.client }}</span><span *ngIf="e.site">{{ e.site }}</span></li></ul></div>
+</section>

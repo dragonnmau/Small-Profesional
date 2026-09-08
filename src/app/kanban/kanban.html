@@ -1,7 +1,22 @@
-<div main class="">
-    <p-card header="Dashboard" class="card-content">
-        <p class="m-0">
-            kanban content goes here.
-        </p>
-    </p-card>
-</div> 
+<section class="kanban-page">
+  <header class="kanban-header"><div><h2>Planificador Kanban</h2><p>Arrastra las tarjetas para ordenar el trabajo y las tareas para cambiar su estado.</p></div><button class="primary-button" type="button" (click)="openColumnModal()"><i class="pi pi-plus"></i> Agregar tarjeta</button></header>
+  <div class="kanban-board" cdkDropList cdkDropListOrientation="horizontal" [cdkDropListData]="columns" (cdkDropListDropped)="dropColumn($event)">
+    <article class="kanban-column" *ngFor="let column of columns" cdkDrag>
+      <header class="column-header" cdkDragHandle><h3>{{ column.title }}</h3><span class="task-count">{{ column.tasks.length }}</span><button class="icon-button delete-button" type="button" title="Borrar tarjeta" (click)="deleteColumn(column)"><i class="pi pi-trash"></i></button></header>
+      <div class="task-list" cdkDropList [id]="taskListId(column)" [cdkDropListData]="column.tasks" [cdkDropListConnectedTo]="taskListIds" (cdkDropListDropped)="dropTask($event)">
+        <button class="task-card" type="button" *ngFor="let task of column.tasks" cdkDrag (click)="openTaskDetails(task)"><span class="priority" [class.high]="task.priority === 'Alta'" [class.medium]="task.priority === 'Media'">{{ task.priority }}</span><strong>{{ task.title }}</strong><small *ngIf="task.assignee"><i class="pi pi-user"></i> {{ task.assignee }}</small></button>
+        <div class="empty-state" *ngIf="!column.tasks.length">Suelta tareas aquí</div>
+      </div>
+      <button class="add-task-button" type="button" (click)="openTaskModal(column)"><i class="pi pi-plus"></i> Agregar tarea</button>
+    </article>
+  </div>
+</section>
+<div class="modal-backdrop" *ngIf="modalMode" (click)="closeModal()"><section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header class="modal-header"><h3>{{ modalMode === 'column' ? 'Nueva tarjeta' : modalMode === 'task' ? 'Detalles de la tarea' : selectedTask?.title }}</h3><button class="icon-button" type="button" (click)="closeModal()"><i class="pi pi-times"></i></button></header>
+  <form *ngIf="modalMode === 'column' || modalMode === 'task'" (ngSubmit)="saveModal()">
+    <label *ngIf="modalMode === 'column'">Nombre de la tarjeta<input name="columnName" [(ngModel)]="columnName" placeholder="Ej. En revisión" required autofocus></label>
+    <ng-container *ngIf="modalMode === 'task'"><label>Título de la tarea<input name="taskTitle" [(ngModel)]="taskForm.title" placeholder="Describe la tarea" required autofocus></label><label>Descripción<textarea name="description" [(ngModel)]="taskForm.description" placeholder="Detalles, notas o instrucciones"></textarea></label><div class="form-grid"><label>Responsable<input name="assignee" [(ngModel)]="taskForm.assignee" placeholder="Nombre"></label><label>Fecha límite<input type="date" name="dueDate" [(ngModel)]="taskForm.dueDate"></label></div><label>Prioridad<select name="priority" [(ngModel)]="taskForm.priority"><option>Alta</option><option>Media</option><option>Baja</option></select></label></ng-container>
+    <footer class="modal-actions"><button type="button" class="secondary-button" (click)="closeModal()">Cancelar</button><button class="primary-button" type="submit">Guardar</button></footer>
+  </form>
+  <div class="task-details" *ngIf="modalMode === 'details' && selectedTask"><p *ngIf="selectedTask.description">{{ selectedTask.description }}</p><dl><div><dt>Responsable</dt><dd>{{ selectedTask.assignee || 'Sin asignar' }}</dd></div><div><dt>Fecha límite</dt><dd>{{ selectedTask.dueDate || 'Sin fecha' }}</dd></div><div><dt>Prioridad</dt><dd>{{ selectedTask.priority }}</dd></div></dl><footer class="modal-actions"><button class="primary-button" type="button" (click)="closeModal()">Cerrar</button></footer></div>
+</section></div>

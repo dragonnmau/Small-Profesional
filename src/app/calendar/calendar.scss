@@ -1,0 +1,47 @@
+.card {
+	border-radius: 6px;
+	padding: 1rem;
+	background: var(--surface-card, #fff);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+.current-date {
+	color: var(--text-secondary, #666);
+	font-size: 0.95rem;
+}
+.event-card { margin-top: 1rem; padding: 1.25rem; border-radius: 6px; background: var(--surface-card, #fff); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.event-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.form-title, .field-wide, .form-actions { grid-column: 1 / -1; margin: 0; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.event-input { width: 100%; padding: 0.6rem; border-radius: 4px; border: 1px solid #ddd; box-sizing: border-box; font: inherit; font-weight: 400; }
+textarea.event-input { min-height: 88px; resize: vertical; }
+.form-actions { display: flex; justify-content: flex-end; }
+.btn-add { padding: 0.6rem 1rem; border-radius: 4px; background: var(--primary-color, #0d6efd); color: #fff; border: none; cursor: pointer; }
+.events ul { list-style: none; padding: 0; margin: 0; }
+.events { margin-top: 1.5rem; }
+.events li { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.5rem 0; border-bottom: 1px dashed rgba(0,0,0,0.12); }
+
+.calendar-container { display: flex; flex-direction: column; gap: 0.5rem; }
+.week-days { display: grid; grid-template-columns: repeat(7, 1fr); }
+.weekday { text-align: center; font-weight: 600; padding: 0.35rem 0; color: var(--text-secondary,#666); }
+.weeks { display: block; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); }
+.day { min-height: 80px; border: 1px solid transparent; padding: 0.4rem; box-sizing: border-box; cursor: pointer; }
+.day.other-month { opacity: 0.45; }
+.day.today { background: rgba(13,110,253,0.06); border-radius: 4px; }
+.daynum { font-weight:700; margin-bottom:0.25rem; }
+.day-events { font-size: 0.85rem; color: var(--text-secondary,#444); }
+.event { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.title { display:flex; align-items:center; gap:0.5rem }
+.nav { background:transparent; border:0; font-size:1.25rem; cursor:pointer }
+
+@media (max-width: 640px) {
+	.event-form { grid-template-columns: 1fr; }
+	.form-title, .field-wide, .form-actions { grid-column: auto; }
+}

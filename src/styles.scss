@@ -33,7 +33,40 @@ html {
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
+html {
+  --surface-card: var(--p-surface-0);
+  --text-secondary: var(--p-text-muted-color);
+  --primary-color: var(--p-primary-color);
+}
+
 .card-content{
-  background-color:#3b3b46 !important;
+  background-color: var(--p-surface-800) !important;
   margin-bottom: 10px;
+}
+
+html.app-dark {
+  color-scheme: dark;
+  background-color: #15171c;
+  color: #f1f5f9;
+  --surface-card: var(--p-surface-900);
+}
+
+html.app-dark body {
+  background-color: #15171c;
+  color: #f1f5f9;
+}
+
+/* Vista compacta del calendario de servicios */
+body .service-page .calendar-card { width: 100%; padding: .6rem; }
+body .service-page .weekdays { margin-top: .55rem; }
+body .service-page .weekdays span { padding: .25rem; }
+body .service-page .calendar-day { min-height: 2.25rem; padding: .18rem; }
+body .service-page .calendar-day > strong { margin-bottom: .1rem; font-size: .68rem; }
+body .service-page .calendar-service { margin-bottom: .1rem; padding: .1rem .2rem; font-size: .6rem; }
+body .service-page .calendar-note { margin-top: .45rem; }
+body .service-page .cost-totals { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+body .service-page .secondary-total { background: var(--p-surface-100); color: var(--p-text-color); }
+
+@media (max-width: 640px) {
+  body .service-page .cost-totals { grid-template-columns: 1fr; }
 }

@@ -1,7 +1,11 @@
-<div main class="">
-    <p-card header="Dashboard" class="card-content">
-        <p class="m-0">
-            gantt content goes here.
-        </p>
-    </p-card>
-</div> 
+<section class="gantt-page">
+  <header class="gantt-header"><div><h2>Planificador Gantt</h2><p>Arrastra las barras horizontalmente para mover las tareas. Haz clic en una tarea para editarla.</p></div><button class="primary-button" type="button" (click)="openNewTask()"><i class="pi pi-plus"></i> Agregar tarea</button></header>
+  <div class="gantt-scroll">
+    <div class="gantt-table" [style.width.px]="timelineWidth + 230">
+      <div class="gantt-head"><div class="task-heading">Tarea</div><div class="date-heading" [style.width.px]="timelineWidth"><div class="day-head" *ngFor="let day of days" [style.width.px]="dayWidth"><span>{{ dayLabel(day) }}</span><strong>{{ dateLabel(day) }}</strong></div></div></div>
+      <div class="gantt-row" *ngFor="let task of tasks"><div class="task-name"><strong>{{ task.title }}</strong><small>{{ task.assignee || 'Sin asignar' }} · {{ task.duration }} día{{ task.duration === 1 ? '' : 's' }}</small></div><div class="timeline-grid" [style.width.px]="timelineWidth"><span class="grid-day" *ngFor="let day of days" [style.width.px]="dayWidth"></span><button class="gantt-bar" type="button" cdkDrag cdkDragLockAxis="x" cdkDragBoundary=".timeline-grid" (cdkDragEnded)="moveTask(task, $event)" (click)="openEditTask(task)" [class]="'gantt-bar ' + task.color" [style.left.px]="taskLeft(task)" [style.width.px]="taskWidth(task)"><span class="bar-title">{{ task.title }}</span></button></div></div>
+      <div class="empty-row" *ngIf="!tasks.length">Aún no hay tareas. Agrega una para comenzar.</div>
+    </div>
+  </div>
+</section>
+<div class="modal-backdrop" *ngIf="modalOpen" (click)="closeModal()"><section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()"><header><h3>{{ editingTaskId === null ? 'Agregar tarea' : 'Editar tarea' }}</h3><button class="icon-button" type="button" (click)="closeModal()"><i class="pi pi-times"></i></button></header><form (ngSubmit)="saveTask()"><label>Título<input name="title" [(ngModel)]="taskForm.title" required autofocus></label><div class="form-grid"><label>Fecha de inicio<input type="date" name="start" [(ngModel)]="taskForm.start" required></label><label>Duración (días)<input type="number" min="1" [max]="totalDays" name="duration" [(ngModel)]="taskForm.duration" required></label></div><label>Responsable<input name="assignee" [(ngModel)]="taskForm.assignee" placeholder="Nombre del responsable"></label><label>Color<select name="color" [(ngModel)]="taskForm.color"><option value="blue">Azul</option><option value="purple">Morado</option><option value="green">Verde</option><option value="orange">Naranja</option></select></label><footer><button *ngIf="editingTaskId !== null" class="delete-button" type="button" (click)="deleteTask()"><i class="pi pi-trash"></i> Eliminar</button><span></span><button class="secondary-button" type="button" (click)="closeModal()">Cancelar</button><button class="primary-button" type="submit">Guardar</button></footer></form></section></div>

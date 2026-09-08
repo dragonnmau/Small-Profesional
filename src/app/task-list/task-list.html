@@ -1,13 +1,11 @@
-<div main class="">
-    <p-card header="Lista de tareas" class="card-content">
-        <p class="m-0">
-            task-list content goes here.
-        </p>
-    </p-card>
-
-    <p-card header="Task List" class="card-content">
-        <p class="m-0">
-            Task List content goes here.
-        </p>
-    </p-card>
-</div> 
+<section class="task-page"><header class="task-header"><div><h2>Lista de tareas</h2><p>Organiza los servicios en una estructura de tareas y subtareas.</p></div><button class="primary-button" type="button" (click)="openNewTask()"><i class="pi pi-plus"></i> Nueva tarea</button></header>
+  <div class="tree-card"><div class="tree-head"><span>Tarea</span><span>Avance</span><span>Prioridad</span><span>Responsable</span><span>Estado</span><span>Costo</span><span></span></div>
+    <ng-container *ngTemplateOutlet="taskRows; context: { parentId: null, level: 0 }"></ng-container>
+    <div class="empty-state" *ngIf="!tasks.length">No hay tareas creadas.</div>
+  </div>
+</section>
+<ng-template #taskRows let-parentId="parentId" let-level="level"><ng-container *ngFor="let task of children(parentId)">
+  <div class="tree-row"><div class="task-title" [style.paddingLeft.px]="16 + level * 24"><i class="pi" [class.pi-folder]="hasChildren(task)" [class.pi-file]="!hasChildren(task)"></i><div><strong>{{ task.title }}</strong><small>Creada por {{ task.createdBy }} <span *ngIf="task.tags.length">·</span> <em *ngFor="let tag of task.tags">{{ tag }}</em></small></div></div><div class="progress"><span>{{ task.progress }}%</span><div><i [style.width.%]="task.progress"></i></div></div><span class="badge priority" [class.high]="task.priority === 'Alta'" [class.low]="task.priority === 'Baja'">{{ task.priority }}</span><span>{{ task.assignee || 'Sin asignar' }}</span><span class="badge status" [class.done]="task.status === 'Completada'" [class.active]="task.status === 'En proceso'">{{ task.status }}</span><span>{{ task.cost | currency:'MXN':'symbol-narrow':'1.0-0' }}</span><div class="actions"><button type="button" title="Crear subtarea" (click)="openNewTask(task.id)"><i class="pi pi-plus"></i></button><button type="button" title="Editar tarea" (click)="openEditTask(task)"><i class="pi pi-pencil"></i></button></div></div>
+  <ng-container *ngTemplateOutlet="taskRows; context: { parentId: task.id, level: level + 1 }"></ng-container>
+</ng-container></ng-template>
+<div class="modal-backdrop" *ngIf="modalOpen" (click)="closeModal()"><section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()"><header><h3>{{ editingTaskId === null ? 'Crear tarea' : 'Editar tarea' }}</h3><button class="icon-button" type="button" (click)="closeModal()"><i class="pi pi-times"></i></button></header><form (ngSubmit)="saveTask()"><label>Título de la tarea<input name="title" [(ngModel)]="taskForm.title" required autofocus></label><label>Tarea padre<select name="parentId" [(ngModel)]="taskForm.parentId"><option [ngValue]="null">Sin tarea padre</option><option *ngFor="let task of parentCandidates()" [ngValue]="task.id">{{ task.title }}</option></select></label><div class="form-grid"><label>Avance (%)<input type="number" min="0" max="100" name="progress" [(ngModel)]="taskForm.progress"></label><label>Prioridad<select name="priority" [(ngModel)]="taskForm.priority"><option>Alta</option><option>Media</option><option>Baja</option></select></label></div><div class="form-grid"><label>Responsable<input name="assignee" [(ngModel)]="taskForm.assignee" placeholder="Usuario asignado"></label><label>Creada por<input name="createdBy" [(ngModel)]="taskForm.createdBy" required></label></div><label>Estado<select name="status" [(ngModel)]="taskForm.status"><option>Pendiente</option><option>En proceso</option><option>Completada</option></select></label><label>Etiquetas<input name="tags" [(ngModel)]="taskForm.tagsText" placeholder="Ej. Visita, Urgente, Cliente"></label><label>Costo del servicio<input type="number" min="0" step="0.01" name="cost" [(ngModel)]="taskForm.cost"></label><footer><button class="secondary-button" type="button" (click)="closeModal()">Cancelar</button><button class="primary-button" type="submit">Guardar tarea</button></footer></form></section></div>

@@ -1,0 +1,64 @@
+<main class="tax-page">
+	<header class="page-heading">
+		<div>
+			<p class="eyebrow">Contabilidad</p>
+			<h1>Calculadora de impuestos</h1>
+			<p class="intro">Calcula importes con las tasas vigentes de tu operación.</p>
+		</div>
+	</header>
+
+	<section class="settings-panel" aria-labelledby="settings-title">
+		<div class="settings-copy">
+			<p class="eyebrow">Configuración</p>
+			<h2 id="settings-title">Tasas aplicables</h2>
+			<p>Las tasas se guardan en la base de datos al confirmar.</p>
+		</div>
+		<div class="settings-fields">
+			<label>IVA (%) <input type="number" min="0" max="100" step="0.01" [(ngModel)]="settings.ivaRate" /></label>
+			<label>ISR (%) <input type="number" min="0" max="100" step="0.01" [(ngModel)]="settings.isrRate" /></label>
+			<button type="button" class="save-button" (click)="saveSettings()">Guardar tasas</button>
+			<span class="saved-message" role="status" *ngIf="saved">Tasas guardadas</span>
+		</div>
+	</section>
+
+	<section class="calculators" aria-label="Calculadoras por tipo de persona">
+		<article class="calculator-card moral-card">
+			<div class="card-heading"><span class="card-number">01</span><div><p class="eyebrow">Personas morales</p><h2>Cálculo de IVA</h2></div></div>
+			<label class="amount-field">Subtotal <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralBase" /></label>
+			<div class="retention-fields">
+				<label>Retención de IVA <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralIvaRetention" /></label>
+				<label>Retención de ISR <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralIsrRetention" /></label>
+			</div>
+			<dl class="result-list">
+				<div><dt>Subtotal</dt><dd>{{ moralBase | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+				<div><dt>IVA trasladado ({{ settings.ivaRate }}%)</dt><dd>{{ moralIva | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+				<div><dt>Retención de IVA</dt><dd>-{{ moralIvaRetention | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+				<div><dt>Retención de ISR</dt><dd>-{{ moralIsrRetention | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+				<div class="result-total"><dt>Total neto</dt><dd>{{ moralTotal | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+			</dl>
+			<p class="formula-note">Subtotal + IVA trasladado - retenciones</p>
+		</article>
+
+		<article class="calculator-card fisica-card">
+			<div class="card-heading"><span class="card-number">02</span><div><p class="eyebrow">Personas físicas</p><h2>Cálculo de IVA</h2></div></div>
+			<div class="sub-calculators">
+				<section class="sub-calculator">
+					<div class="sub-heading"><span>01</span><h3>Costo más IVA</h3></div>
+					<label class="amount-field">Costo antes de IVA <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="fisicaCost" /></label>
+					<dl class="result-list compact-list">
+						<div><dt>IVA ({{ settings.ivaRate }}%)</dt><dd>{{ fisicaIvaAdded | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+						<div class="result-total"><dt>Total a cobrar</dt><dd>{{ fisicaTotalAdded | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+					</dl>
+				</section>
+				<section class="sub-calculator">
+					<div class="sub-heading"><span>02</span><h3>Costo total menos IVA</h3></div>
+					<label class="amount-field">Total con IVA <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="fisicaTotal" /></label>
+					<dl class="result-list compact-list">
+						<div><dt>IVA incluido</dt><dd>{{ fisicaIvaFromTotal | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+						<div class="result-total"><dt>Costo sin IVA</dt><dd>{{ fisicaBaseFromTotal | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
+					</dl>
+				</section>
+			</div>
+		</article>
+	</section>
+</main>
