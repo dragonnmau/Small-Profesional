@@ -18,13 +18,24 @@
 
 <main class="app-layout">
   <aside class="sidebar-shell">
-    <div class="brand"><i class="pi pi-briefcase"></i><span>SMALL<span>PROFESIONAL</span></span></div>
+    <div class="brand">
+      <div class="brand-logo">
+        <img *ngIf="businessInformation.image" [src]="businessInformation.image" alt="Logotipo de la empresa">
+        <i *ngIf="!businessInformation.image" class="pi pi-briefcase"></i>
+      </div>
+      <span>{{ businessInformation.commercialName || 'SMALL PROFESIONAL' }}</span>
+    </div>
     <nav class="sidebar-navigation" aria-label="Menu principal"><p-panelmenu [model]="items" [multiple]="true"
         styleClass="service-panel-menu"></p-panelmenu></nav>
     <footer class="user-area">
-      <div class="user-profile"><p-avatar image="https://primefaces.org/cdn/primeng/images/demo/avatar/amyelsner.png"
-          shape="circle" />
-        <div><strong>Usuario Usuario</strong><small>Admin</small> <small>Empresa</small><small>Licencia Basica</small>
+      <div class="user-profile">
+        <p-avatar [image]="userInformation.image || 'https://primefaces.org/cdn/primeng/images/demo/avatar/amyelsner.png'"
+          [label]="userInformation.image ? undefined : 'U'" shape="circle" />
+        <div class="user-details">
+          <strong>{{ userInformation.name || 'Usuario sin configurar' }}</strong>
+          <small class="user-type"><i class="pi pi-shield"></i> {{ userInformation.userType }}</small>
+          <small *ngIf="userInformation.email"><i class="pi pi-envelope"></i> {{ userInformation.email }}</small>
+          <small *ngIf="userInformation.mobile || userInformation.phone"><i class="pi pi-phone"></i> {{ userInformation.mobile || userInformation.phone }}</small>
         </div>
       </div>
       <div class="user-actions"><button type="button" (click)="lockApp()"><i class="pi pi-lock"></i>Bloquear

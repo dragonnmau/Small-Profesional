@@ -1,0 +1,55 @@
+﻿const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const Database = require('better-sqlite3');
+const { ClientDatabase } = require('./database');
+
+test('Facturas: IVA, folios, persistencia y validaciones de pagos', () => {
+  const store = Object.create(ClientDatabase.prototype);
+  store.db = new Database(':memory:');
+  try {
+    store.setupDatabase();
+    const clientId = Number(store.db.prepare("INSERT INTO clients (name, razon_social, rfc) VALUES ('Prueba facturas', 'Cliente prueba', 'AAA010101AAA')").run().lastInsertRowid);
+    const accountId = Number(store.db.prepare("INSERT INTO bank_accounts (name, bank, account_number) VALUES ('Prueba', 'Banco', '123')").run().lastInsertRowid);
+    const insert = store.db.prepare("INSERT INTO payments (client_id, account_id, payment_date, invoice_number, folio, amount, status) VALUES (?, ?, '2026-09-12', '', ?, ?, ?)");
+    const payment = (folio, amount, status = 'Activo') => Number(insert.run(clientId, accountId, folio, amount, status).lastInsertRowid);
+    const first = payment('P1', 100);
+    const second = payment('P2', 116);
+    const third = payment('P3', 0.03);
+    const reversed = payment('P4', 100, 'Revertido');
+    const request = { clientId, invoiceDate: '2026-09-12', ivaMode: 'added', paymentIds: [first], createdBy: 'Prueba' };
+    assert.throws(() => store.createInvoice({ ...request, note: 123 }), /nota debe ser texto/);
+    const added = store.createInvoice({ ...request, note: '  Nota de prueba\nSegunda línea  ' });
+    assert.equal(added.note, 'Nota de prueba\nSegunda línea');
+    assert.equal(added.subtotal, 100); assert.equal(added.iva, 16); assert.equal(added.total, 116);
+    assert.equal(added.folio, '20260912-000001');
+    assert.throws(() => store.createInvoice(request), /no estar facturados/);
+    assert.throws(() => store.revertPayment({ id: first }), /ya está facturado/);
+    const included = store.createInvoice({ ...request, ivaMode: 'included', paymentIds: [second] });
+    assert.equal(included.subtotal, 100); assert.equal(included.iva, 16); assert.equal(included.total, 116);
+    assert.equal(included.id, 2);
+    assert.equal(included.note, '');
+    assert.throws(() => store.createInvoice({ ...request, paymentIds: [third, third] }), /duplicados/);
+    assert.throws(() => store.createInvoice({ ...request, paymentIds: [third, reversed] }), /activos/);
+    assert.throws(() => store.createInvoice({ ...request, paymentIds: [] }), /al menos/);
+    assert.throws(() => store.createInvoice({ ...request, paymentIds: [third], invoiceDate: '2026-02-30' }), /Fecha/);
+    const otherClient = Number(store.db.prepare("INSERT INTO clients (name, rfc) VALUES ('Otro cliente', 'BBB010101BBB')").run().lastInsertRowid);
+    assert.throws(() => store.createInvoice({ ...request, clientId: otherClient, paymentIds: [third] }), /pertenecer/);
+    store.db.prepare("UPDATE clients SET rfc = '' WHERE id = ?").run(otherClient);
+    assert.throws(() => store.createInvoice({ ...request, clientId: otherClient, paymentIds: [third] }), /RFC/);
+    const rounded = store.createInvoice({ ...request, ivaMode: 'included', paymentIds: [third] });
+    assert.equal(rounded.id, 3); assert.equal(rounded.total, 0.03);
+    store.db.prepare("UPDATE clients SET rfc = 'CAMBIADO' WHERE id = ?").run(clientId);
+    store.setupDatabase();
+    const saved = store.listInvoices();
+    assert.equal(saved.length, 3); assert.equal(saved[2].rfc, 'AAA010101AAA');
+    assert.equal(saved[2].payments[0].id, first);
+    assert.equal(saved[2].note, 'Nota de prueba\nSegunda línea');
+    const updated = store.updateInvoiceNote({ id: added.id, note: '  Nota editada\nDetalle adicional  ' });
+    assert.deepEqual(updated, { ...saved[2], note: 'Nota editada\nDetalle adicional' });
+    store.setupDatabase();
+    assert.equal(store.listInvoices().find(invoice => invoice.id === added.id).note, updated.note);
+    assert.throws(() => store.updateInvoiceNote({ id: added.id, note: 123 }), /nota debe ser texto/);
+    assert.throws(() => store.updateInvoiceNote({ id: 99999, note: 'Nota' }), /no existe/);
+    assert.equal(store.updateInvoiceNote({ id: added.id, note: '   ' }).note, '');
+  } finally { store.db.close(); }
+});

@@ -11,11 +11,11 @@
 		<div class="settings-copy">
 			<p class="eyebrow">Configuración</p>
 			<h2 id="settings-title">Tasas aplicables</h2>
-			<p>Las tasas se guardan en la base de datos al confirmar.</p>
+			<p>Tasas generales guardadas en la base de datos. La calculadora de retenciones utiliza las tasas de su perfil, no el ISR general.</p>
 		</div>
 		<div class="settings-fields">
 			<label>IVA (%) <input type="number" min="0" max="100" step="0.01" [(ngModel)]="settings.ivaRate" /></label>
-			<label>ISR (%) <input type="number" min="0" max="100" step="0.01" [(ngModel)]="settings.isrRate" /></label>
+			<label>ISR general (%) <input type="number" min="0" max="100" step="0.01" [(ngModel)]="settings.isrRate" /></label>
 			<button type="button" class="save-button" (click)="saveSettings()">Guardar tasas</button>
 			<span class="saved-message" role="status" *ngIf="saved">Tasas guardadas</span>
 		</div>
@@ -23,21 +23,39 @@
 
 	<section class="calculators" aria-label="Calculadoras por tipo de persona">
 		<article class="calculator-card moral-card">
-			<div class="card-heading"><span class="card-number">01</span><div><p class="eyebrow">Personas morales</p><h2>Cálculo de IVA</h2></div></div>
-			<label class="amount-field">Subtotal <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralBase" /></label>
-			<div class="retention-fields">
-				<label>Retención de IVA <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralIvaRetention" /></label>
-				<label>Retención de ISR <span class="input-prefix">$</span><input type="number" min="0" step="0.01" [(ngModel)]="moralIsrRetention" /></label>
-			</div>
-			<dl class="result-list">
-				<div><dt>Subtotal</dt><dd>{{ moralBase | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
-				<div><dt>IVA trasladado ({{ settings.ivaRate }}%)</dt><dd>{{ moralIva | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
-				<div><dt>Retención de IVA</dt><dd>-{{ moralIvaRetention | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
-				<div><dt>Retención de ISR</dt><dd>-{{ moralIsrRetention | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
-				<div class="result-total"><dt>Total neto</dt><dd>{{ moralTotal | currency:'MXN':'symbol':'1.2-2' }}</dd></div>
-			</dl>
-			<p class="formula-note">Subtotal + IVA trasladado - retenciones</p>
-		</article>
+      <div class="card-heading"><span class="card-number">01</span><div><p class="eyebrow">Factura a una persona moral</p><h2>Retenciones de ISR e IVA</h2></div></div>
+      <label class="profile-field">Perfil de quien emite la factura
+        <select [(ngModel)]="profileId" (ngModelChange)="applyProfile()">
+          <option *ngFor="let profile of profiles" [value]="profile.id">{{ profile.label }}</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </label>
+      <p class="profile-note">{{ profileNote }}</p>
+      <div class="retention-options">
+        <label>Calcular desde<select [(ngModel)]="calculationMode"><option value="subtotal">Subtotal sin impuestos</option><option value="net">Total neto a recibir</option></select></label>
+        <label>Decimales<select [(ngModel)]="decimals"><option [ngValue]="2">2 decimales</option><option [ngValue]="4">4 decimales</option><option [ngValue]="6">6 decimales</option></select></label>
+      </div>
+      <label class="amount-field">{{ calculationMode === 'subtotal' ? 'Subtotal sin impuestos' : 'Total neto deseado' }} (MXN)<span class="input-prefix">$</span><input type="number" min="0" max="1000000000000" [step]="decimals === 2 ? '0.01' : decimals === 4 ? '0.0001' : '0.000001'" [(ngModel)]="moralBase" /></label>
+      <div class="retention-options">
+        <label>IVA trasladado (%)<input type="number" min="0" max="100" step="0.01" [(ngModel)]="retentionIvaRate" (ngModelChange)="useCustomRates()" /></label>
+        <label>Retención de ISR (%)<input type="number" min="0" max="100" step="0.01" [(ngModel)]="retentionIsrRate" (ngModelChange)="useCustomRates()" /></label>
+      </div>
+      <label class="profile-field">Retención de IVA<select [(ngModel)]="ivaRetention" (ngModelChange)="useCustomRates()"><option value="none">Sin retención</option><option value="two-thirds">Dos terceras partes del IVA</option><option value="four-percent">4% del subtotal · Autotransporte de bienes</option></select></label>
+      <p class="formula-note">IVA: usa 16%, 0% para operaciones sin IVA trasladado u otra tasa aplicable. El 8% requiere que la operación cumpla los requisitos del estímulo fronterizo.</p>
+      <ng-container *ngIf="retentionCalculation as calculation">
+        <p class="calculation-error" role="alert" *ngIf="calculation.error">{{ calculation.error }}</p>
+        <dl class="result-list retention-results" *ngIf="calculation.result as result" aria-live="polite">
+          <div><dt>Subtotal</dt><dd>{{ result.subtotal | currency:'MXN':'symbol':digitsInfo }}</dd></div>
+          <div><dt>+ IVA trasladado ({{ retentionIvaRate }}%)</dt><dd>{{ result.iva | currency:'MXN':'symbol':digitsInfo }}</dd></div>
+          <div><dt>− Retención de ISR ({{ retentionIsrRate }}%)</dt><dd>{{ result.isr | currency:'MXN':'symbol':digitsInfo }}</dd></div>
+          <div><dt>− {{ ivaRetentionLabel }}</dt><dd>{{ result.retainedIva | currency:'MXN':'symbol':digitsInfo }}</dd></div>
+          <div class="result-total"><dt>Total neto a recibir</dt><dd>{{ result.total | currency:'MXN':'symbol':digitsInfo }}</dd></div>
+          <p class="formula-note" *ngIf="result.roundingDifference !== 0">Diferencia con el neto solicitado por redondeo: {{ result.roundingDifference | currency:'MXN':'symbol':digitsInfo }}. Puedes aumentar los decimales.</p>
+        </dl>
+      </ng-container>
+      <p class="formula-note">Subtotal + IVA − ISR retenido − IVA retenido. Cada concepto se redondea a los decimales seleccionados.</p>
+      <details class="tax-sources"><summary>Fundamento de los perfiles</summary><p>El receptor es una persona moral. Selecciona el régimen y actividad del emisor para aplicar las retenciones correspondientes.</p><p><a href="https://www.diputados.gob.mx/LeyesBiblio/pdf/LISR.pdf" target="_blank" rel="noopener noreferrer">Ley del ISR, artículos 106, 113-J y 116</a><br><a href="https://www.diputados.gob.mx/LeyesBiblio/regley/Reg_LIVA_250914.pdf" target="_blank" rel="noopener noreferrer">Reglamento del IVA, artículo 3</a></p></details>
+    </article>
 
 		<article class="calculator-card fisica-card">
 			<div class="card-heading"><span class="card-number">02</span><div><p class="eyebrow">Personas físicas</p><h2>Cálculo de IVA</h2></div></div>

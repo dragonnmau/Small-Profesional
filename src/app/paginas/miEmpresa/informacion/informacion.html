@@ -1,1 +1,128 @@
-<p>informacion works!</p>
+<section class="information-page">
+	<header class="page-header">
+		<div>
+			<span class="eyebrow"><i class="pi pi-building"></i> Mi empresa</span>
+			<h1>Informacion de la cuenta</h1>
+			<p>Administra los datos que identifican a tu negocio y a tu usuario.</p>
+		</div>
+		<span class="role-badge" *ngIf="isAdmin"><i class="pi pi-shield"></i> Administrador</span>
+	</header>
+
+	<form class="information-form" (ngSubmit)="saveInformation()">
+		<section class="settings-section" *ngIf="isAdmin">
+			<div class="section-heading">
+				<div class="section-icon business-icon"><i class="pi pi-building"></i></div>
+				<div><h2>Datos del negocio</h2><p>Esta informacion aparecera en tus documentos y reportes.</p></div>
+			</div>
+
+			<div class="section-content">
+				<div class="logo-column">
+					<div class="image-preview business-preview" [class.has-image]="businessImage">
+						<img *ngIf="businessImage" [src]="businessImage" alt="Imagen del negocio">
+						<i *ngIf="!businessImage" class="pi pi-building"></i>
+					</div>
+					<label class="upload-button" for="business-image"><i class="pi pi-camera"></i> Cargar imagen</label>
+					<input id="business-image" class="visually-hidden" type="file" accept="image/*"
+						(change)="selectImage($event, 'business')">
+					<small>PNG o JPG, maximo 5 MB</small>
+				</div>
+
+				<div class="fields-column">
+					<div class="form-grid two-columns">
+						<label>Nombre comercial <span class="required">*</span>
+							<input name="commercialName" [(ngModel)]="businessForm.commercialName" required
+								placeholder="Ej. Empresa S.A. de C.V.">
+						</label>
+						<fieldset>
+							<legend>Tipo de persona <span class="required">*</span></legend>
+							<div class="radio-group">
+								<label class="radio-option"><input type="radio" name="personType" value="Fisica"
+										[(ngModel)]="businessForm.personType"> <span>Persona fisica</span></label>
+								<label class="radio-option"><input type="radio" name="personType" value="Moral"
+										[(ngModel)]="businessForm.personType"> <span>Persona moral</span></label>
+							</div>
+						</fieldset>
+					</div>
+					<div class="form-grid two-columns">
+						<label *ngIf="businessForm.personType === 'Moral'">RFC de empresa <span class="required">*</span>
+							<input name="companyRfc" [(ngModel)]="businessForm.companyRfc" maxlength="13"
+								placeholder="Ej. ABC010203AB1" style="text-transform: uppercase">
+						</label>
+						<label [class.full-width]="businessForm.personType !== 'Moral'">Direccion
+							<textarea name="address" [(ngModel)]="businessForm.address" rows="3"
+								placeholder="Calle, numero, colonia, ciudad y estado"></textarea>
+						</label>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="settings-section">
+			<div class="section-heading">
+				<div class="section-icon user-icon"><i class="pi pi-user"></i></div>
+				<div><h2>Datos del usuario</h2><p>Actualiza tu informacion personal y los medios para contactarte.</p></div>
+			</div>
+
+			<div class="section-content">
+				<div class="logo-column">
+					<div class="image-preview profile-preview" [class.has-image]="profileImage">
+						<img *ngIf="profileImage" [src]="profileImage" alt="Imagen de perfil">
+						<i *ngIf="!profileImage" class="pi pi-user"></i>
+					</div>
+					<label class="upload-button" for="profile-image"><i class="pi pi-camera"></i> Cargar imagen</label>
+					<input id="profile-image" class="visually-hidden" type="file" accept="image/*"
+						(change)="selectImage($event, 'profile')">
+					<small>PNG o JPG, maximo 5 MB</small>
+				</div>
+
+				<div class="fields-column">
+					<div class="form-grid two-columns">
+						<label>Nombre completo <span class="required">*</span>
+							<input name="userName" [(ngModel)]="userForm.name" required placeholder="Tu nombre completo">
+						</label>
+						<label>RFC
+							<input name="userRfc" [(ngModel)]="userForm.rfc" maxlength="13" placeholder="RFC personal"
+								style="text-transform: uppercase">
+						</label>
+					</div>
+					<div class="form-grid two-columns">
+						<label>Tipo de usuario
+							<select name="userType" [(ngModel)]="userForm.userType">
+								<option value="admin">Administrador</option>
+								<option value="contabilidad">Contabilidad</option>
+							</select>
+						</label>
+					</div>
+					<div class="form-grid two-columns">
+						<label>Correo electronico <span class="required">*</span>
+							<input name="email" [(ngModel)]="userForm.email" type="email" required placeholder="correo@ejemplo.com">
+						</label>
+						<label>Contraseña
+							<input name="password" [(ngModel)]="userForm.password" type="password" placeholder="********">
+						</label>
+					</div>
+					<div class="form-grid three-columns">
+						<label>Telefono
+							<input name="phone" [(ngModel)]="userForm.phone" type="tel" placeholder="55 0000 0000">
+						</label>
+						<label>Extension
+							<input name="extension" [(ngModel)]="userForm.extension" inputmode="numeric" placeholder="123">
+						</label>
+						<label>Celular
+							<input name="mobile" [(ngModel)]="userForm.mobile" type="tel" placeholder="55 0000 0000">
+						</label>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<footer class="form-actions">
+			<span><i class="pi pi-info-circle"></i> Los campos con * son obligatorios.</span>
+			<div class="save-area">
+				<span class="save-message saved" *ngIf="saveState === 'saved'"><i class="pi pi-check-circle"></i> Cambios guardados</span>
+				<span class="save-message error" *ngIf="saveState === 'error'"><i class="pi pi-exclamation-circle"></i> No se pudieron guardar los cambios</span>
+				<button class="primary-button" type="submit" [disabled]="saveState === 'saving'"><i class="pi pi-check"></i> {{ saveState === 'saving' ? 'Guardando...' : 'Guardar cambios' }}</button>
+			</div>
+		</footer>
+	</form>
+</section>

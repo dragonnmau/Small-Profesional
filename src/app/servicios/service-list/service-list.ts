@@ -1,11 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Db, DbClient, DbLinkedCompany, DbService, NewDbService, ServiceExportOptions } from '../../services/db';
+import { Db, DbClient, DbCollaborator, DbLinkedCompany, DbService, NewDbService, ServiceExportOptions } from '../../services/db';
 
 type ServiceStatus = 'Completado' | 'Cancelado en transito' | 'Cancelado' | 'Pendiente';
 type TravelDeposit = 'Si' | 'No' | 'N/A';
-interface ServiceForm extends Omit<DbService, 'id' | 'client' | 'company' | 'clientId' | 'companyId' | 'materialsCost'> { clientId: number | null; companyId: number | null; materialsCost: number; }
+interface ServiceForm extends Omit<DbService, 'id' | 'client' | 'company' | 'clientId' | 'companyId' | 'materialsCost' | 'assignedUserName'> { clientId: number | null; companyId: number | null; materialsCost: number; }
 interface CalendarDay { date: string; day: number; services: DbService[]; }
 interface ExportCostField { key: string; label: string; }
 
@@ -14,6 +14,7 @@ export class ServiceList implements OnInit {
     services: DbService[] = [];
     clients: DbClient[] = [];
     linkedCompanies: DbLinkedCompany[] = [];
+    collaborators: DbCollaborator[] = [];
     cities: string[] = [];
     materialNames: string[] = [];
     selectedMonth = this.currentDate().slice(0, 7);
@@ -75,7 +76,9 @@ export class ServiceList implements OnInit {
         return cells;
     }
 
-    openForm(): void { this.editingServiceId = null; this.serviceForm = this.emptyForm(); this.isFormOpen = true; }
+    trackCalendarDay(index: number, cell: CalendarDay | null): string | number { return cell?.date ?? index; }
+
+    openForm(date?: string): void { this.editingServiceId = null; this.serviceForm = this.emptyForm(); if (date) this.serviceForm.date = date; this.isFormOpen = true; }
     openEditForm(service: DbService): void { this.editingServiceId = service.id; this.serviceForm = { ...service, materials: service.materials.map(material => ({ ...material })) }; this.isFormOpen = true; }
     closeForm(): void { this.isFormOpen = false; }
     openExport(): void {
@@ -88,8 +91,10 @@ export class ServiceList implements OnInit {
     exportServices(): void {
         const options: ServiceExportOptions = { month: this.exportMonth === 'all' ? '' : this.exportMonth, clientId: this.exportClientId, companyId: this.exportCompanyId, fields: this.exportCostFields.filter(field => this.exportFields[field.key]).map(field => field.key) };
         if (!options.fields.length) return;
-        const filePath = this.db.exportServices(options);
-        if (filePath) { this.closeExport(); alert(`Servicios exportados correctamente:\n${filePath}`); }
+        try {
+            const filePath = this.db.exportServices(options);
+            if (filePath) { this.closeExport(); alert(`Servicios exportados correctamente:\n${filePath}`); }
+        } catch (error) { alert(error instanceof Error ? error.message : 'No se pudo exportar la lista de servicios.'); }
     }
     onClientChange(): void { if (!this.availableCompanies.some(company => company.id === this.serviceForm.companyId)) this.serviceForm.companyId = null; }
     onServiceListClientChange(): void { if (!this.serviceListCompanies.some(company => company.id === this.selectedCompanyId)) this.selectedCompanyId = null; }
@@ -108,7 +113,7 @@ export class ServiceList implements OnInit {
             date: this.serviceForm.date, time: this.serviceForm.time, clientId: this.serviceForm.clientId, companyId: this.serviceForm.companyId,
             city: this.serviceForm.city.trim(), site: this.serviceForm.site.trim(), description: this.serviceForm.description.trim(), folio: this.serviceForm.folio.trim(), status: this.serviceForm.status, servicePaid: this.serviceForm.servicePaid,
             serviceCost: Number(this.serviceForm.serviceCost) || 0, travelAllowance: Number(this.serviceForm.travelAllowance) || 0, travelDeposit: this.serviceForm.travelDeposit,
-            transportCost: Number(this.serviceForm.transportCost) || 0, gasolineCost: Number(this.serviceForm.gasolineCost) || 0,
+            transportCost: Number(this.serviceForm.transportCost) || 0, gasolineCost: Number(this.serviceForm.gasolineCost) || 0, assignedUserId: this.serviceForm.assignedUserId,
             materials: this.serviceForm.materials.filter(material => material.name.trim() || Number(material.cost) > 0).map(material => ({ name: material.name.trim(), cost: Number(material.cost) || 0 }))
         };
         if (this.editingServiceId === null) this.db.createService(values); else this.db.updateService(this.editingServiceId, values);
@@ -122,13 +127,13 @@ export class ServiceList implements OnInit {
     }
 
     private loadData(): void {
-        this.services = this.db.listServices(); this.clients = this.db.listClients(); this.linkedCompanies = this.db.listLinkedCompanies();
+        this.services = this.db.listServices(); this.clients = this.db.listClients(); this.linkedCompanies = this.db.listLinkedCompanies(); this.collaborators = this.db.listCollaborators().filter(user => user.status === 'Activo');
         this.cities = this.db.listServiceCities(); this.materialNames = this.db.listServiceMaterials();
     }
 
     private emptyForm(): ServiceForm {
         const date = this.currentDate();
-        return { date, time: this.currentTime(), clientId: null, companyId: null, city: '', site: '', description: '', folio: '', status: 'Pendiente', servicePaid: 'No', serviceCost: 0, travelAllowance: 0, travelDeposit: 'N/A', materialsCost: 0, transportCost: 0, gasolineCost: 0, materials: [] };
+        return { date, time: this.currentTime(), clientId: null, companyId: null, city: '', site: '', description: '', folio: '', status: 'Pendiente', servicePaid: 'No', serviceCost: 0, travelAllowance: 0, travelDeposit: 'N/A', materialsCost: 0, transportCost: 0, gasolineCost: 0, assignedUserId: null, materials: [] };
     }
 
     private currentDate(): string {

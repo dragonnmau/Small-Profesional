@@ -5,7 +5,7 @@ import { Db, DbLinkedCompany, NewDbClient, TaxRegime } from '../../services/db';
 
 type ClientKind = 'Cliente' | 'Empresa';
 type ClientStatus = 'Activo' | 'Baja';
-interface Client { id: number; kind: ClientKind; name: string; businessName: string; rfc: string; taxRegime: string; address: string; postalCode: string; contact: string; phone: string; email: string; status: ClientStatus; }
+interface Client { id: number; kind: ClientKind; name: string; businessName: string; rfc: string; personType: 'Fisica' | 'Moral' | null; taxRegime: string; address: string; postalCode: string; contact: string; phone: string; email: string; status: ClientStatus; }
 interface ClientForm extends Omit<Client, 'id' | 'kind' | 'status'> {}
 interface CompanyForm { name: string; businessName: string; contact: string; phone: string; email: string; }
 
@@ -16,6 +16,20 @@ export class ClientList {
   clients: Client[] = [];
   taxRegimes:TaxRegime[] = [];
   search = '';
+  errorMessage = '';
+
+  get availableTaxRegimes(): TaxRegime[] {
+    if (!this.clientForm.personType) return [];
+    const selected = this.clientForm.personType === 'Fisica' ? 'fisica' : 'moral';
+    return this.taxRegimes.filter(regime => {
+      const type = regime.personType.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      return type.includes('amb') || type.includes(selected);
+    });
+  }
+  onPersonTypeChange(): void {
+    if (!this.availableTaxRegimes.some(regime => regime.name === this.clientForm.taxRegime)) this.clientForm.taxRegime = '';
+    this.errorMessage = '';
+  }
   isFormOpen = false;
   editingClientId: number | null = null;
   formKind: ClientKind = 'Cliente';
@@ -47,8 +61,8 @@ export class ClientList {
     return !term ? this.clients : this.clients.filter(client => [client.name, client.businessName, client.contact, client.email, client.status].some(value => value.toLocaleLowerCase().includes(term)));
   }
   get activeClients(): number { return this.clients.filter(client => client.status === 'Activo').length; }
-  openNew(kind: ClientKind): void { this.editingClientId = null; this.formKind = kind; this.clientForm = this.emptyForm(); this.isFormOpen = true; this.loadtaxRegimes(); }
-  openEdit(client: Client): void { this.editingClientId = client.id; this.formKind = client.kind; const { id, kind, status, ...form } = client; this.clientForm = { ...form }; this.isFormOpen = true; }
+  openNew(kind: ClientKind): void { this.errorMessage = ''; this.editingClientId = null; this.formKind = kind; this.clientForm = this.emptyForm(); this.isFormOpen = true; this.loadtaxRegimes(); }
+  openEdit(client: Client): void { this.errorMessage = ''; this.loadtaxRegimes(); this.editingClientId = client.id; this.formKind = client.kind; const { id, kind, status, ...form } = client; this.clientForm = { ...form, personType: form.personType ?? null }; this.isFormOpen = true; }
   closeForm(): void { this.isFormOpen = false; }
   openCompanyForm(client: Client): void { this.selectedClient = client; this.editingCompanyId = null; this.companyForm = this.emptyCompanyForm(); this.isCompanyFormOpen = true; }
   openCompanyEdit(company: DbLinkedCompany): void { this.editingCompanyId = company.id; this.companyForm = { name: company.name, businessName: company.businessName, contact: company.contact, phone: company.phone, email: company.email }; this.isLinkedCompaniesOpen = false; this.isCompanyFormOpen = true; }
@@ -63,6 +77,10 @@ export class ClientList {
   companiesFor(clientId: number): DbLinkedCompany[] { return this.linkedCompanies.filter(company => company.clientId === clientId); }
   saveClient(): void {
     if (!this.clientForm.name.trim()) return;
+    if (!this.clientForm.personType || !this.availableTaxRegimes.some(regime => regime.name === this.clientForm.taxRegime)) {
+      this.errorMessage = 'Selecciona el tipo de persona y un r?gimen fiscal compatible.'; return;
+    }
+    try {
     const values = { ...this.clientForm, name: this.clientForm.name.trim() };
     if (this.editingClientId === null) {
       this.dbService.createClient({ ...values, kind: this.formKind, status: 'Activo' });
@@ -72,6 +90,7 @@ export class ClientList {
     }
     this.loadClients();
     this.closeForm();
+    } catch (error) { this.errorMessage = error instanceof Error ? error.message : 'No se pudo guardar el cliente.'; }
   }
   toggleStatus(client: Client): void {
     const isActive = client.status === 'Activo';
@@ -98,6 +117,6 @@ export class ClientList {
     this.clients = clients;
   }
   private loadLinkedCompanies(): void { this.linkedCompanies = this.dbService.listLinkedCompanies(); }
-  private emptyForm(): ClientForm { return { name: '', businessName: '', rfc: '', taxRegime: '', address: '', postalCode: '', contact: '', phone: '', email: '' }; }
+  private emptyForm(): ClientForm { return { name: '', businessName: '', rfc: '', personType: null, taxRegime: '', address: '', postalCode: '', contact: '', phone: '', email: '' }; }
   private emptyCompanyForm(): CompanyForm { return { name: '', businessName: '', contact: '', phone: '', email: '' }; }
 }

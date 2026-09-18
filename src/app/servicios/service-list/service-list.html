@@ -17,13 +17,15 @@
       <span>Lun</span><span>Mar</span><span>Mie</span><span>Jue</span><span>Vie</span><span>Sab</span><span>Dom</span>
     </div>
     <div class="calendar-grid">
-      <div class="calendar-day" *ngFor="let cell of calendarDays" [class.blank]="!cell"><ng-container
+      <div class="calendar-day" *ngFor="let cell of calendarDays; trackBy: trackCalendarDay" [class.blank]="!cell"
+        [attr.tabindex]="cell ? 0 : null" [attr.aria-label]="cell ? 'Agregar servicio el ' + cell.date + ': doble clic o Enter' : null"
+        (dblclick)="cell && openForm(cell.date)" (keydown.enter)="cell && $event.target === $event.currentTarget && openForm(cell.date)"><ng-container
           *ngIf="cell"><strong>{{ cell.day }}</strong><button class="calendar-service"
             *ngFor="let service of cell.services" type="button" [class.completed]="service.status === 'Completado'"
-            [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'" [class.pending]="service.status === 'Pendiente'" (click)="openEditForm(service)"
+            [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'" [class.pending]="service.status === 'Pendiente'" (click)="openEditForm(service)" (dblclick)="$event.stopPropagation()"
             [title]="service.client">{{ service.time }} · {{ service.folio || service.client }}</button></ng-container></div>
     </div>
-    <p class="calendar-note"><i class="pi pi-info-circle"></i> Selecciona un servicio en el calendario para editarlo.
+    <p class="calendar-note"><i class="pi pi-info-circle"></i> Haz doble clic en un día para agregar un servicio con esa fecha, o enfócalo y presiona Enter. Selecciona un servicio para editarlo.
     </p>
   </section>
   <div class="service-card">
@@ -43,6 +45,7 @@
             <th>Folio</th>
             <th>Fecha</th>
             <th>Cliente / sitio</th>
+            <th>Asignado a</th>
             <th>Ciudad</th>
             <th>Descripcion</th>
             <th>Estatus</th>
@@ -55,6 +58,7 @@
             <td><strong>{{ service.folio || 'Sin folio' }}</strong></td>
             <td>{{ service.date | date:'dd/MM/yyyy' }}</td>
             <td><strong>{{ service.client }}</strong><small>{{ service.site || 'Sin sitio registrado' }}</small></td>
+            <td>{{ service.assignedUserName || 'Administrador' }}</td>
             <td>{{ service.city || '—' }}</td>
             <td class="description">{{ service.description || '—' }}</td>
             <td><span class="status" [class.completed]="service.status === 'Completado'"
@@ -67,7 +71,7 @@
             </td>
           </tr>
           <tr *ngIf="!filteredServices.length">
-            <td colspan="8" class="empty-state">No hay servicios registrados para este mes.</td>
+            <td colspan="9" class="empty-state">No hay servicios registrados para este mes.</td>
           </tr>
         </tbody>
       </table>
@@ -95,7 +99,7 @@
           </select></label><label>Servicio pagado<select name="servicePaid" [(ngModel)]="serviceForm.servicePaid"><option>Si</option><option>No</option></select></label></div>
       <div class="form-grid three"><label>Cliente<select name="clientId" [(ngModel)]="serviceForm.clientId"
         (ngModelChange)="onClientChange()" required><option [ngValue]="null">Selecciona un cliente</option><option
-          *ngFor="let client of clients" [ngValue]="client.id">{{ client.name }}{{ client.businessName ? ' · ' + client.businessName : '' }}</option></select></label><label>Empresa<select name="companyId" [(ngModel)]="serviceForm.companyId" [disabled]="serviceForm.clientId === null"><option [ngValue]="null">Sin empresa ligada</option><option *ngFor="let company of availableCompanies" [ngValue]="company.id">{{ company.name }}</option></select></label><label>Ciudad<input name="city"
+          *ngFor="let client of clients" [ngValue]="client.id">{{ client.name }}{{ client.businessName ? ' · ' + client.businessName : '' }}</option></select></label><label>Empresa<select name="companyId" [(ngModel)]="serviceForm.companyId" [disabled]="serviceForm.clientId === null"><option [ngValue]="null">Sin empresa ligada</option><option *ngFor="let company of availableCompanies" [ngValue]="company.id">{{ company.name }}</option></select></label><label>Asignar a<select name="assignedUserId" [(ngModel)]="serviceForm.assignedUserId"><option [ngValue]="null">Administrador</option><option *ngFor="let collaborator of collaborators" [ngValue]="collaborator.id">{{ collaborator.name }} · {{ collaborator.userType }}</option></select></label><label>Ciudad<input name="city"
         list="service-cities" [(ngModel)]="serviceForm.city"><datalist id="service-cities"><option *ngFor="let city of cities" [value]="city"></option></datalist></label></div><label>Sitio<input name="site" [(ngModel)]="serviceForm.site"
           placeholder="Ubicacion o area de atencion"></label><label>Descripcion<textarea name="description"
           [(ngModel)]="serviceForm.description" rows="2"></textarea></label>

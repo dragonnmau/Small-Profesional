@@ -21,7 +21,7 @@
         <thead>
           <tr>
             <th>Cliente / empresa</th>
-            <th>Razon social</th>
+            <th>Tipo de persona</th><th>Razon social</th>
             <th>Contacto</th>
             <th>Telefono</th>
             <th>Correo electronico</th>
@@ -34,7 +34,7 @@
           <tr *ngFor="let client of filteredClients" [class.inactive]="client.status === 'Baja'">
             <td><strong>{{ client.name }}</strong><small><i class="pi" [class.pi-user]="client.kind === 'Cliente'"
                   [class.pi-building]="client.kind === 'Empresa'"></i> {{ client.kind }}</small></td>
-            <td>{{ client.businessName || '—' }}</td>
+            <td>{{ client.personType === 'Fisica' ? 'F?sica' : client.personType === 'Moral' ? 'Moral' : 'Sin especificar' }}</td><td>{{ client.businessName || '—' }}</td>
             <td>{{ client.contact || '—' }}</td>
             <td>{{ client.phone || '—' }}</td>
             <td>{{ client.email || '—' }}</td>
@@ -56,7 +56,7 @@
             </td>
           </tr>
           <tr *ngIf="!filteredClients.length">
-            <td colspan="8" class="empty-state">No se encontraron clientes.</td>
+            <td colspan="9" class="empty-state">No se encontraron clientes.</td>
           </tr>
         </tbody>
       </table>
@@ -77,13 +77,15 @@
       <div class="form-grid"><label>Nombre {{ formKind }}<input name="name" [(ngModel)]="clientForm.name"
             required></label><label>Razon social<input name="businessName"
             [(ngModel)]="clientForm.businessName"></label></div>
-      <div class="form-grid three"><label>RFC<input name="rfc" [(ngModel)]="clientForm.rfc" minlength="12" maxlength="13" pattern="[A-Za-z0-9]{12,13}" autocomplete="off" style="text-transform: uppercase" placeholder="Ej. ABC010203AB1"></label><label>Regimen fiscal<select name="taxRegime" [(ngModel)]="clientForm.taxRegime" required><option value="" disabled>Selecciona un regimen fiscal</option><option *ngFor="let regime of taxRegimes" [value]="regime.name">{{ regime.satCode }} - {{ regime.name }}</option></select></label><label>Codigo postal<input name="postalCode"
+      <label>Tipo de persona<select name="personType" [(ngModel)]="clientForm.personType" (ngModelChange)="onPersonTypeChange()" required><option [ngValue]="null" disabled>Selecciona el tipo de persona</option><option value="Fisica">Persona f?sica</option><option value="Moral">Persona moral</option></select></label>
+      <div class="form-grid three"><label>RFC<input name="rfc" [(ngModel)]="clientForm.rfc" minlength="12" maxlength="13" pattern="[A-Za-z0-9]{12,13}" autocomplete="off" style="text-transform: uppercase" placeholder="Ej. ABC010203AB1"></label><label>Regimen fiscal<select name="taxRegime" [(ngModel)]="clientForm.taxRegime" [disabled]="!clientForm.personType" required><option value="" disabled>{{ clientForm.personType ? 'Selecciona un r?gimen fiscal' : 'Selecciona primero el tipo de persona' }}</option><option *ngFor="let regime of availableTaxRegimes" [value]="regime.name">{{ regime.satCode }} - {{ regime.name }}</option></select></label><label>Codigo postal<input name="postalCode"
             [(ngModel)]="clientForm.postalCode" inputmode="numeric"></label></div><label>Direccion<textarea
           name="address" [(ngModel)]="clientForm.address" rows="2"></textarea></label>
       <div class="form-grid three"><label>Contacto<input name="contact"
             [(ngModel)]="clientForm.contact"></label><label>Numero telefonico<input name="phone"
             [(ngModel)]="clientForm.phone" type="tel"></label><label>Correo electronico<input name="email"
             [(ngModel)]="clientForm.email" type="email"></label></div>
+      <p *ngIf="errorMessage" role="alert" class="form-error">{{ errorMessage }}</p>
       <footer><button class="secondary-button" type="button" (click)="closeForm()">Cancelar</button><button
           class="primary-button" type="submit">{{ editingClientId === null ? 'Guardar' : 'Guardar cambios' }}</button>
       </footer>

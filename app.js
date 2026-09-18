@@ -2,8 +2,9 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     const url = require("url");
     const path = require("path");
   const { ClientDatabase } = require('./database');
-  const XLSX = require('xlsx');
-  const fs = require('fs');
+  const { exportServices } = require('./services-template-export');
+
+  const { exportPendingServices } = require('./pending-services-export');
 
     let mainWindow
   let clientDatabase
@@ -45,6 +46,67 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     ipcMain.on('tax-regimes:list', event => { event.returnValue = clientDatabase.listTaxRegimes() })
     ipcMain.on('tax-settings:get', event => { event.returnValue = clientDatabase.getTaxSettings() })
     ipcMain.on('tax-settings:update', (event, settings) => { event.returnValue = clientDatabase.updateTaxSettings(settings) })
+    ipcMain.on('account-information:get', event => { event.returnValue = clientDatabase.getAccountInformation() })
+    ipcMain.on('account-information:save', (event, information) => { event.returnValue = clientDatabase.saveAccountInformation(information) })
+    ipcMain.on('collaborators:list', event => { event.returnValue = clientDatabase.listCollaborators() })
+    ipcMain.on('collaborators:create', (event, collaborator) => { event.returnValue = clientDatabase.createCollaborator(collaborator) })
+    ipcMain.on('collaborators:update', (event, request) => { event.returnValue = clientDatabase.updateCollaborator(request.id, request.collaborator) })
+    ipcMain.on('collaborators:status', (event, request) => { clientDatabase.updateCollaboratorStatus(request); event.returnValue = true })
+    for (const [channel, handler] of [
+      ['expenses:list', () => clientDatabase.listExpenses()],
+      ['bank-accounts:update', request => clientDatabase.updateBankAccount(request)],
+      ['bank-cards:update', request => clientDatabase.updateBankCard(request)],
+      ['expenses:categories', () => clientDatabase.listExpenseCategories()],
+      ['expenses:create-category', name => clientDatabase.createExpenseCategory(name)],
+      ['expenses:create', request => clientDatabase.createExpense(request)],
+      ['expenses:attachment', request => clientDatabase.getExpenseAttachment(request)]
+    ]) {
+      ipcMain.on(channel, (event, request) => {
+        try { event.returnValue = { value: handler(request) }; }
+        catch (error) { event.returnValue = { error: error.message }; }
+      });
+    }
+    ipcMain.on('bank-accounts:list', event => { event.returnValue = clientDatabase.listBankAccounts() })
+    ipcMain.on('bank-accounts:create', (event, account) => { event.returnValue = clientDatabase.createBankAccount(account) })
+    ipcMain.on('bank-cards:create', (event, card) => {
+      try { event.returnValue = { value: clientDatabase.createBankCard(card) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('bank-accounts:balance', (event, request) => { event.returnValue = clientDatabase.updateBankBalance(request) })
+    ipcMain.on('bank-accounts:deactivate', (event, request) => { clientDatabase.deactivateBankAccount(request); event.returnValue = true })
+    ipcMain.on('bank-movements:create', (event, movement) => { event.returnValue = clientDatabase.createBankMovement(movement) })
+    ipcMain.on('payments:clients', event => { event.returnValue = clientDatabase.listPaymentClients() })
+    ipcMain.handle('payments:export-pending', async (event, options) => {
+      try { return { value: await exportPendingServices(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
+      catch (error) { return { error: error.message || 'No se pudieron exportar los servicios.' }; }
+    })
+    ipcMain.on('payments:services', (event, clientId) => { event.returnValue = clientDatabase.listPaymentServices(clientId) })
+    ipcMain.on('invoices:list', event => { event.returnValue = clientDatabase.listInvoices() })
+    ipcMain.on('invoices:update-note', (event, request) => {
+      try { event.returnValue = { value: clientDatabase.updateInvoiceNote(request) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('invoices:create', (event, request) => {
+      try { event.returnValue = { value: clientDatabase.createInvoice(request) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('payments:details', (event, id) => {
+      try { event.returnValue = { value: clientDatabase.listPaidServices(id) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('payments:list', event => { event.returnValue = clientDatabase.listPayments() })
+    ipcMain.on('payments:create', (event, payment) => {
+      try { event.returnValue = { value: clientDatabase.createPayment(payment) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('payments:update', (event, request) => {
+      try { event.returnValue = { value: clientDatabase.updatePayment(request) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('payments:revert', (event, request) => {
+      try { event.returnValue = { value: clientDatabase.revertPayment(request) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
     ipcMain.on('services:list', event => { event.returnValue = clientDatabase.listServices() })
     ipcMain.on('services:create', (event, service) => { event.returnValue = clientDatabase.createService(service) })
     ipcMain.on('services:update', (event, request) => { event.returnValue = clientDatabase.updateService(request.id, request.service) })
@@ -52,54 +114,21 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     ipcMain.on('service-cities:list', event => { event.returnValue = clientDatabase.listServiceCities() })
     ipcMain.on('service-materials:list', event => { event.returnValue = clientDatabase.listServiceMaterials() })
     ipcMain.on('services:export', (event, options) => {
-      const services = clientDatabase.listServices().filter(service =>
-        (!options.month || service.date.startsWith(options.month)) &&
-        (options.clientId === null || service.clientId === options.clientId) &&
-        (options.companyId === null || service.companyId === options.companyId)
-      );
-      const selectedFields = Array.isArray(options.fields) ? options.fields : [];
-      const templatePath = path.join(__dirname, 'public', 'Servicios Del Mes 2026 Plantilla.xlsx');
-      const workbook = fs.existsSync(templatePath) ? XLSX.readFile(templatePath) : XLSX.utils.book_new();
-      const rows = services.map(service => {
-        const row = {
-          Fecha: service.date,
-          Hora: service.time,
-          Folio: service.folio,
-          Cliente: service.client,
-          Empresa: service.company,
-          Ciudad: service.city,
-          Sitio: service.site,
-          Descripción: service.description,
-          Estatus: service.status,
-          'Costo de servicio': service.serviceCost,
-          Viático: service.travelAllowance,
-          'Costo de materiales': service.materialsCost,
-          'Costo de transporte': service.transportCost,
-          'Costo de gasolina': service.gasolineCost,
-          'Costo final': service.serviceCost + service.travelAllowance + service.materialsCost + service.transportCost + service.gasolineCost
-        };
-        const costFields = new Set(selectedFields);
-        return Object.fromEntries(Object.entries(row).filter(([key]) => !['Costo de servicio', 'Viático', 'Costo de materiales', 'Costo de transporte', 'Costo de gasolina', 'Costo final'].includes(key) || costFields.has(key)));
-      });
-      const sheet = XLSX.utils.json_to_sheet(rows);
-      if (workbook.SheetNames.length) workbook.Sheets[workbook.SheetNames[0]] = sheet;
-      else XLSX.utils.book_append_sheet(workbook, sheet, 'Servicios del mes');
-      const selectedClient = options.clientId === null
-        ? 'Todos-los-clientes'
-        : clientDatabase.listClients().find(client => client.id === options.clientId)?.name || 'Cliente';
-      const safeClientName = selectedClient.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').trim();
-      const monthName = options.month || 'todos-los-meses';
-      const filePath = dialog.showSaveDialogSync(mainWindow, {
-        title: 'Exportar servicios',
-        defaultPath: `Servicios-${safeClientName}-${monthName}.xlsx`,
-        filters: [{ name: 'Excel', extensions: ['xlsx'] }]
-      });
-      if (!filePath) { event.returnValue = null; return; }
-      XLSX.writeFile(workbook, filePath);
-      event.returnValue = filePath;
+      try {
+        event.returnValue = { value: exportServices(clientDatabase, options, {
+          dialog, parent: mainWindow,
+          templatePath: path.join(__dirname, 'public', 'Servicios Del Mes 2026 Plantilla.xlsx')
+        }) };
+      } catch (error) { event.returnValue = { error: error.message || 'No se pudo exportar la lista de servicios.' }; }
     })
-    ipcMain.on('clients:create', (event, client) => { event.returnValue = clientDatabase.createClient(client) })
-    ipcMain.on('clients:update', (event, request) => { event.returnValue = clientDatabase.updateClient(request.id, request.client) })
+    ipcMain.on('clients:create', (event, client) => {
+      try { event.returnValue = { value: clientDatabase.createClient(client) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
+    ipcMain.on('clients:update', (event, request) => {
+      try { event.returnValue = { value: clientDatabase.updateClient(request.id, request.client) }; }
+      catch (error) { event.returnValue = { error: error.message }; }
+    })
     ipcMain.on('clients:update-status', (event, request) => {
       clientDatabase.updateClientStatus(request.id, request.status)
       event.returnValue = true

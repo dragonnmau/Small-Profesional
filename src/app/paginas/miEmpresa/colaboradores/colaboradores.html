@@ -1,0 +1,106 @@
+<section class="collaborators-page" *ngIf="isAdmin; else accessDenied">
+	<header class="page-header">
+		<div><span class="eyebrow"><i class="pi pi-users"></i> Mi empresa</span>
+			<h1>Colaboradores</h1>
+			<p>Administra los usuarios y asigna servicios a tu equipo.</p>
+		</div><button class="primary-button" type="button" (click)="openNew()"><i class="pi pi-plus"></i> Nuevo
+			colaborador</button>
+	</header>
+	<div class="summary">
+		<div><i class="pi pi-users"></i><span><strong>{{ activeCount }}</strong> usuarios activos</span></div>
+		<div><i class="pi pi-shield"></i><span><strong>{{ collaborators.length }}</strong> usuarios registrados</span>
+		</div>
+	</div>
+	<section class="collaborators-card">
+		<div class="section-heading">
+			<div>
+				<h2>Usuarios del equipo</h2>
+				<p>El administrador principal siempre estará disponible para asignar servicios.</p>
+			</div>
+		</div>
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th>Usuario</th>
+						<th>Tipo</th>
+						<th>Correo</th>
+						<th>Telefono</th>
+						<th>Estatus</th>
+						<th>Acciones</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr *ngFor="let collaborator of collaborators" [class.inactive]="collaborator.status === 'Baja'">
+						<td>
+							<div class="user-cell"><img *ngIf="collaborator.image" [src]="collaborator.image"
+									alt=""><span class="avatar-fallback" *ngIf="!collaborator.image">{{
+									collaborator.name.slice(0, 1).toUpperCase() }}</span><strong>{{ collaborator.name
+									}}</strong></div>
+						</td>
+						<td><span class="role">{{ collaborator.userType }}</span></td>
+						<td>{{ collaborator.email || '—' }}</td>
+						<td>{{ collaborator.mobile || collaborator.phone || '—' }}</td>
+						<td><span class="status" [class.inactive-status]="collaborator.status === 'Baja'">{{
+								collaborator.status }}</span></td>
+						<td>
+							<div class="row-actions"><button class="icon-button" type="button" title="Editar"
+									(click)="openEdit(collaborator)"><i class="pi pi-pencil"></i></button><button
+									class="icon-button" type="button" *ngIf="collaborator.id !== 0"
+									[title]="collaborator.status === 'Activo' ? 'Dar de baja' : 'Reactivar'"
+									(click)="toggleStatus(collaborator)"><i class="pi"
+										[class.pi-user-minus]="collaborator.status === 'Activo'"
+										[class.pi-user-plus]="collaborator.status === 'Baja'"></i></button></div>
+						</td>
+					</tr>
+					<tr *ngIf="!collaborators.length">
+						<td colspan="6" class="empty-state">No hay colaboradores registrados.</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+</section>
+<ng-template #accessDenied>
+	<section class="access-denied"><i class="pi pi-lock"></i>
+		<h1>Acceso restringido</h1>
+		<p>Solo el usuario admin puede administrar colaboradores.</p>
+	</section>
+</ng-template>
+
+<div class="modal-backdrop" *ngIf="isModalOpen" (click)="closeModal()">
+	<section class="modal" (click)="$event.stopPropagation()">
+		<header>
+			<div>
+				<h2>{{ editingId === null ? 'Nuevo colaborador' : 'Editar colaborador' }}</h2>
+				<p>Los datos se guardarán como usuario del sistema.</p>
+			</div><button class="icon-button" type="button" (click)="closeModal()"><i class="pi pi-times"></i></button>
+		</header>
+		<form (ngSubmit)="save()">
+			<div class="profile-row">
+				<div class="image-preview"><img *ngIf="form.image" [src]="form.image" alt="Perfil"><i
+						*ngIf="!form.image" class="pi pi-user"></i></div><label class="upload-button"
+					for="collaborator-image"><i class="pi pi-camera"></i> Cargar imagen</label><input
+					id="collaborator-image" class="visually-hidden" type="file" accept="image/*"
+					(change)="selectImage($event)">
+			</div>
+			<div class="form-grid two"><label>Nombre completo *<input name="name" [(ngModel)]="form.name"
+						required></label><label>Tipo de usuario *<select name="userType" [(ngModel)]="form.userType"
+						required>
+						<option *ngFor="let role of roles" [value]="role">{{ role }}</option>
+					</select></label></div>
+			<div class="form-grid two"><label>RFC<input name="rfc" [(ngModel)]="form.rfc"
+						maxlength="13"></label><label>Correo electrónico *<input name="email" [(ngModel)]="form.email"
+						type="email" required></label></div>
+			<div class="form-grid two"><label>Contraseña<input name="password" [(ngModel)]="form.password"
+						type="password"></label><label>Telefono<input name="phone" [(ngModel)]="form.phone"
+						type="tel"></label></div>
+			<div class="form-grid two"><label>Extension<input name="extension"
+						[(ngModel)]="form.extension"></label><label>Celular<input name="mobile"
+						[(ngModel)]="form.mobile" type="tel"></label></div>
+			<p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+			<footer><button class="secondary-button" type="button" (click)="closeModal()">Cancelar</button><button
+					class="primary-button" type="submit">Guardar colaborador</button></footer>
+		</form>
+	</section>
+</div>

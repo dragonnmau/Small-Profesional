@@ -1,0 +1,78 @@
+<main class="expenses-page">
+  <header class="page-header"><div><span class="eyebrow">Contabilidad</span><h1>Gastos</h1><p>Registra salidas de tus cuentas y conserva sus comprobantes.</p></div><button class="primary-button" (click)="openModal()">+ Registrar gasto</button></header>
+  @if (success) { <p class="success" role="status">{{ success }}</p> }
+  @if (error && !isModalOpen) { <p class="form-error" role="alert">{{ error }}</p> }
+  <section class="panel filters" aria-label="Filtros de gastos">
+    <label>Buscar<input type="search" [(ngModel)]="search" placeholder="Concepto, categoría o cuenta"></label>
+    <label>Mes del gasto<input type="month" [(ngModel)]="filterMonth"></label>
+    <label>Cuenta<select [(ngModel)]="filterAccount"><option [ngValue]="null">Todas las cuentas</option>@for (account of filterAccounts; track account.id) { <option [ngValue]="account.id">{{ account.name }}</option> }</select></label>
+    <button class="secondary-button" (click)="search = ''; filterMonth = ''; filterAccount = null">Limpiar</button>
+  </section>
+  <div class="summary" aria-label="Resumen de los gastos filtrados">
+    <article class="panel"><span>Total de gastos · MXN</span><strong>{{ summary.total | currency:'MXN':'symbol-narrow' }}</strong><small>{{ filteredExpenses.length }} registros</small></article>
+    <article class="panel"><span>IVA registrado</span><strong>{{ summary.iva | currency:'MXN':'symbol-narrow' }}</strong><small>Según los filtros seleccionados</small></article>
+    <article class="panel"><span>Con factura</span><strong>{{ summary.invoices }}</strong><small>Gastos marcados con factura</small></article>
+  </div>
+  <section class="monthly-section" aria-labelledby="monthly-expenses-title">
+    <h2 id="monthly-expenses-title">Gastos por mes</h2>
+    <p class="monthly-hint">Por mes de facturación y año de la fecha del gasto, según los filtros seleccionados.</p>
+    <div class="monthly-cards">
+      @for (month of monthlyExpenses; track month.key) {
+        <article class="panel month-card">
+          <header><h3>{{ month.label }}</h3><i class="pi pi-calendar" aria-hidden="true"></i></header>
+          <p class="month-total">{{ month.total | currency:'MXN':'symbol-narrow' }} <span>MXN</span></p>
+          <div class="month-meta"><span>{{ month.count }} {{ month.count === 1 ? 'gasto' : 'gastos' }}</span><span>IVA {{ month.iva | currency:'MXN':'symbol-narrow' }}</span></div>
+        </article>
+      } @empty { <p class="empty">No hay gastos para mostrar con los filtros seleccionados.</p> }
+    </div>
+  </section>
+  <section class="panel"><h2>Historial de gastos</h2><div class="table-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Cuenta</th><th>Mes de facturación</th><th>Subtotal</th><th>IVA</th><th>Total MXN</th><th>Factura</th><th>Archivos</th></tr></thead>
+    <tbody>@for (expense of filteredExpenses; track expense.id) {
+      <tr><td>{{ expense.expenseDate }}<small>#{{ expense.id }}</small></td><td class="concept">{{ expense.concept }}</td><td>{{ expense.category || "Sin categoría" }}</td><td>{{ expense.accountName }}<small>{{ expense.bank }}</small>@if (expense.cardId) { <small>{{ expense.cardType }} **** {{ expense.cardLastFour }}</small> }</td><td>{{ billingMonthLabel(expense.billingMonth) }}</td><td>{{ expense.subtotal | currency:'MXN':'symbol-narrow' }}</td><td>{{ expense.iva | currency:'MXN':'symbol-narrow' }}<small>{{ expense.ivaMode === 'none' ? 'Sin IVA' : expense.ivaRate + '%' }}</small></td><td><strong>{{ expense.total | currency:'MXN':'symbol-narrow' }}</strong></td><td>{{ expense.hasInvoice ? 'Con factura' : 'Sin factura' }}@if (expense.hasInvoice) { <small class="cfdi-label">{{ cfdiLabel(expense.cfdiUse) }}</small> }</td><td>
+      <div class="attachments">@if (expense.ticketName) { <button class="secondary-button" (click)="download(expense, 'ticket')" [attr.aria-label]="'Descargar ticket de gasto ' + expense.id">Ticket ↓</button> } @if (expense.invoiceName) { <button class="secondary-button" (click)="download(expense, 'invoice')" [attr.aria-label]="'Descargar factura de gasto ' + expense.id">Factura ↓</button> } @if (!expense.ticketName && !expense.invoiceName) { <small>Sin archivos</small> }</div>
+      </td></tr>
+    } @empty { <tr><td colspan="10" class="empty">{{ expenses.length ? 'No hay gastos con estos filtros.' : 'Aún no hay gastos. Registra el primero para comenzar.' }}</td></tr> }</tbody>
+  </table></div></section>
+</main>
+@if (isModalOpen) {
+  <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="expense-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="closeModal()">
+    <header><div><h2 id="expense-title">Registrar gasto</h2><p>El total se descontará de la cuenta seleccionada.</p></div><button class="secondary-button" aria-label="Cerrar" [disabled]="saving || readingFiles > 0" (click)="closeModal()">×</button></header>
+    <form #expenseForm="ngForm" (ngSubmit)="save()">
+      @if (!accounts.length) { <p class="notice">Necesitas una cuenta activa. <a routerLink="/bankAccounts">Ir a cuentas bancarias</a></p> }
+      <div class="form-grid">
+        <label>Cuenta o tarjeta<select name="account" [(ngModel)]="accountSelection" required cdkFocusInitial><option value="" disabled>Selecciona una cuenta o tarjeta</option>@for (option of accountOptions; track option.key) { <option [value]="option.key">{{ option.label }}</option> }</select></label>
+        <label>Mes de facturación<select name="billingMonth" [(ngModel)]="form.billingMonth" required><option value="" disabled>Selecciona un mes</option>@for (month of billingMonths; track month.value) { <option [value]="month.value">{{ month.label }}</option> }</select></label>
+      </div>
+      <label>Fecha<input type="date" name="date" [(ngModel)]="form.expenseDate" required></label>
+      <div class="form-grid"><label>Concepto<textarea name="concept" [(ngModel)]="form.concept" required maxlength="500" rows="2" placeholder="¿En qué se realizó el gasto?"></textarea></label>
+        <label>Categoría<select name="category" [(ngModel)]="form.category" (ngModelChange)="categoryChanged()" required><option value="" disabled>Selecciona una categoría</option>@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }<option value="__new__">+ Agregar nueva categoría</option></select></label>
+      </div>
+      @if (addingCategory) {
+        <div class="new-category"><label>Nueva categoría<input name="newCategory" [(ngModel)]="newCategory" maxlength="80" placeholder="Nombre de la categoría"></label><div class="attachments"><button type="button" class="secondary-button" (click)="addCategory()" [disabled]="!newCategory.trim()">Agregar categoría</button><button type="button" class="secondary-button" (click)="addingCategory = false; categoryError = ''">Cancelar</button></div>
+        @if (categoryError) { <p class="form-error" role="alert">{{ categoryError }}</p> }</div>
+      }
+      <div class="form-grid">
+        <label>{{ form.ivaMode === 'included' ? 'Importe total (MXN)' : 'Importe sin IVA (MXN)' }}<input type="number" name="amount" [(ngModel)]="form.amount" min="0.01" max="999999999.99" step="0.01" required></label>
+        <label>IVA<select name="iva" [(ngModel)]="form.ivaMode"><option value="none">Sin IVA</option><option value="added">Más IVA ({{ ivaRate }}%)</option><option value="included">IVA incluido ({{ ivaRate }}%)</option></select></label>
+      </div>
+      <label class="checkbox"><input type="checkbox" name="hasInvoice" [(ngModel)]="form.hasInvoice" (ngModelChange)="invoiceChanged()">Tiene factura (opcional)</label>
+      @if (form.hasInvoice) {
+        <label>Uso de CFDI (México)<select name="cfdiUse" [(ngModel)]="form.cfdiUse" required><option value="" disabled>Selecciona el uso de CFDI</option>@for (use of cfdiUses; track use.code) { <option [value]="use.code">{{ use.code }} · {{ use.label }}</option> }</select><small>Selecciona el uso que aparece en tu factura.</small></label>
+      }
+      <div class="files">
+        <label>Foto del ticket (opcional)<input type="file" accept=".jpg,.jpeg,.png,.webp" [disabled]="readingFiles > 0" (change)="selectFile($event, 'ticket')"><small>JPG, PNG o WebP · Máximo 5 MB</small></label>
+        @if (form.ticket) { <p class="file-name">{{ form.ticket.name }} <button type="button" class="secondary-button" (click)="form.ticket = null">Quitar ticket</button></p> }
+        @if (form.hasInvoice) {
+          <label>Archivo de factura (opcional)<input type="file" accept=".pdf,.xml,.jpg,.jpeg,.png,.webp" [disabled]="readingFiles > 0" (change)="selectFile($event, 'invoice')"><small>PDF, XML o imagen · Máximo 5 MB</small></label>
+          @if (form.invoice) { <p class="file-name">{{ form.invoice.name }} <button type="button" class="secondary-button" (click)="form.invoice = null">Quitar factura</button></p> }
+        }
+        @if (readingFiles) { <p role="status">Leyendo archivo…</p> }
+        @if (fileError) { <p class="form-error" role="alert">{{ fileError }}</p> }
+      </div>
+      <div class="totals" aria-live="polite"><p>Subtotal <strong>{{ totals.subtotal | currency:'MXN':'symbol-narrow' }}</strong></p><p>IVA <strong>{{ totals.iva | currency:'MXN':'symbol-narrow' }}</strong></p><p class="grand-total">Total a descontar <strong>{{ totals.total | currency:'MXN':'symbol-narrow' }}</strong></p></div>
+      @if (error) { <p class="form-error" role="alert">{{ error }}</p> }
+      <footer><button type="button" class="secondary-button" (click)="closeModal()" [disabled]="saving || readingFiles > 0">Cancelar</button><button type="submit" class="primary-button" [disabled]="saving || readingFiles > 0 || expenseForm.invalid || !form.accountId || !form.concept.trim() || !form.category || addingCategory || (form.hasInvoice && !form.cfdiUse)">{{ saving ? 'Guardando…' : 'Guardar gasto' }}</button></footer>
+    </form>
+  </section></div>
+}

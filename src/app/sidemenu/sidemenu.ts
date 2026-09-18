@@ -1,5 +1,5 @@
 import { Component, inject, OnInit } from '@angular/core';
-import {MatSidenavModule} from '@angular/material/sidenav';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { ButtonModule } from 'primeng/button';
 import { MenuItem } from 'primeng/api';
 import { BadgeModule } from 'primeng/badge';
@@ -12,57 +12,73 @@ import { InputIcon } from 'primeng/inputicon';
 import { SplitButton } from 'primeng/splitbutton';
 import { PanelMenu } from 'primeng/panelmenu';
 import { Router } from '@angular/router';
+import { Db, DbAccountInformation } from '../services/db';
 /**
  * @title Autosize sidenav
  */
 
 @Component({
-  selector: 'app-sidemenu',
-  imports: [
-    MatSidenavModule, ButtonModule,InputTextModule,InputIcon,PanelMenu,
-    Toolbar, BadgeModule,CommonModule,AvatarModule,IconField,SplitButton,
-],
-  templateUrl: './sidemenu.html',
-  styleUrl: './sidemenu.scss'
+    selector: 'app-sidemenu',
+    imports: [
+        MatSidenavModule, ButtonModule, InputTextModule, InputIcon, PanelMenu,
+        Toolbar, BadgeModule, CommonModule, AvatarModule, IconField, SplitButton,
+    ],
+    templateUrl: './sidemenu.html',
+    styleUrl: './sidemenu.scss'
 })
 
 
 export class Sidemenu implements OnInit {
-  items: MenuItem[] | undefined;
-  isDarkTheme = false;
+    items: MenuItem[] | undefined;
+    isDarkTheme = false;
+    accountInformation: DbAccountInformation | null = null;
 
-  constructor(private router: Router) {
+    get userInformation(): DbAccountInformation['user'] {
+        return this.accountInformation?.user ?? {
+            name: '', rfc: '', password: '', email: '', phone: '', extension: '', mobile: '', image: '', userType: 'admin'
+        };
+    }
 
-  }
+    get businessInformation(): DbAccountInformation['business'] {
+        return this.accountInformation?.business ?? {
+            commercialName: '', personType: 'Fisica', companyRfc: '', address: '', image: ''
+        };
+    }
 
-  ngOnInit(){ 
+    constructor(private router: Router, private readonly dbService: Db) {
 
-    const savedTheme = localStorage.getItem('app-theme');
-    this.isDarkTheme = savedTheme ? savedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    this.applyTheme();
+    }
 
-    this.items = [
+    ngOnInit() {
+
+        this.accountInformation = this.dbService.getAccountInformation();
+
+        const savedTheme = localStorage.getItem('app-theme');
+        this.isDarkTheme = savedTheme ? savedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        this.applyTheme();
+
+        this.items = [
             {
-              label: 'Inicio',
-              icon: 'pi pi-home', 
-              items:[
-                {
-                  label: 'Dashboard - imp',
-                  icon: 'pi pi-chart-line',
-                  shortcut: '⌘+D',
-                  command: () => {
-                    this.router.navigate(['/']);
-                  }
-                }
-              ]
+                label: 'Inicio',
+                icon: 'pi pi-home',
+                items: [
+                    {
+                        label: 'Dashboard - imp',
+                        icon: 'pi pi-chart-line',
+                        shortcut: '⌘+D',
+                        command: () => {
+                            this.router.navigate(['/']);
+                        }
+                    }
+                ]
             },
             {
                 label: 'Servicios',
                 items: [
                     {
-                        label: 'Servicios',
+                        label: 'Dashboard',
                         icon: 'pi pi-cog',
-                        badge: 'No disponible',
+                        badge: 'PROXIMAMENTE',
                         styleClass: 'unavailable-menu-item',
                         disabled: true,
                         shortcut: '⌘+O',
@@ -87,44 +103,68 @@ export class Sidemenu implements OnInit {
                         shortcut: '⌘+O',
                         command: () => {
                             this.router.navigate(['/categories']);
-                        }   
+                        }
                     }
                 ]
             },
             {
-                label: 'Tareas',
+                label: 'Tareas/Actividades',
                 items: [
                     {
                         label: 'Task List',
                         icon: 'pi pi-list-check',
                         shortcut: '⌘+N',
-                        command: () => {
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true,
+                        /**
+                         * command: () => {
                             this.router.navigate(['/taskList']);
                         }
+                         */
+                        
                     },
                     {
                         label: 'Planificador',
                         icon: 'pi pi-calendar',
                         shortcut: '⌘+S',
-                        command: () => {
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true,
+                        /**
+                         * command: () => {
                             this.router.navigate(['/calendar']);
                         }
+                         * 
+                         */
+                        
                     },
                     {
                         label: 'Kanban',
                         icon: 'pi pi-receipt',
                         shortcut: '⌘+S',
-                        command: () => {
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true,
+                        /**
+                         * command: () => {
                             this.router.navigate(['/kanban']);
                         }
+                         */
+                        
                     },
-                     {
+                    {
                         label: 'Gantt',
                         icon: 'pi pi-receipt',
                         shortcut: '⌘+S',
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true,
+                        /*
                         command: () => {
                             this.router.navigate(['/gantt']);
-                        }
+                        } 
+                        */
                     }
                 ]
             },
@@ -142,32 +182,30 @@ export class Sidemenu implements OnInit {
                     {
                         label: 'Cuentas Bancarias',
                         icon: 'pi pi-inbox',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true
+                        command: () => {
+                            this.router.navigate(['/bankAccounts']);
+                        }
                     },
                     {
                         label: 'Facturas',
                         icon: 'pi pi-inbox',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true
+                        command: () => { this.router.navigate(['/facturas']); }
                     },
                     {
-                        label: 'Pagos',
+                        label: 'Pagos (Ingresos)',
                         icon: 'pi-money-bil',
                         shortcut: '⌘+Q',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true
+                        command: () => {
+                            this.router.navigate(['/pagos']);
+                        }
                     },
                     {
-                        label: 'Gastos',
+                        label: 'Gastos (Egresos)',
                         icon: 'pi pi-file-send',
                         shortcut: '⌘+Q',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true
+                        command: () => {
+                            this.router.navigate(['/gastos']);
+                        }
                     },
                     {
                         label: 'Reportes',
@@ -189,9 +227,28 @@ export class Sidemenu implements OnInit {
                 ]
             },
             {
-                separator: true
+                label: 'Inventarios',
+                icon: 'pi pi-home',
+                items: [
+                    {
+                        label: 'Productos',
+                        icon: 'pi pi-chart-line',
+                        shortcut: '⌘+I',
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true
+                    },
+                    {
+                        label: 'Cotizador',
+                        icon: 'pi pi-chart-line',
+                        shortcut: '⌘+I',
+                        badge: 'No disponible',
+                        styleClass: 'unavailable-menu-item',
+                        disabled: true
+                    }
+                ]
             },
-             {
+            {
                 label: 'Empresa',
                 items: [
                     {
@@ -206,9 +263,9 @@ export class Sidemenu implements OnInit {
                         label: 'Plantilla trabajadores',
                         icon: 'pi pi-users',
                         shortcut: '⌘+O',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true
+                        command: () => {
+                            this.router.navigate(['/colaboradores']);
+                        }
                     },
                     {
                         label: 'Mi informacion',
@@ -222,23 +279,25 @@ export class Sidemenu implements OnInit {
             },
         ];
 
-  }
+    }
 
-  lockApp(): void {
-    this.router.navigate(['/login']);
-  }
+    lockApp(): void {
+        this.router.navigate(['/login']);
+    }
 
-  logout(): void {
-    this.router.navigate(['/login']);
-  }
+    logout(): void {
+        this.router.navigate(['/login']);
+    }
 
-  toggleTheme(): void {
-    this.isDarkTheme = !this.isDarkTheme;
-    this.applyTheme();
-  }
+    toggleTheme(): void {
+        this.isDarkTheme = !this.isDarkTheme;
+        this.applyTheme();
+    }
 
-  private applyTheme(): void {
-    document.documentElement.classList.toggle('app-dark', this.isDarkTheme);
-    localStorage.setItem('app-theme', this.isDarkTheme ? 'dark' : 'light');
-  }
+    private applyTheme(): void {
+        document.documentElement.classList.toggle('app-dark', this.isDarkTheme);
+        localStorage.setItem('app-theme', this.isDarkTheme ? 'dark' : 'light');
+    }
 }
+
+/// npm run ng g c paginas/miEmpresa/colaboradores

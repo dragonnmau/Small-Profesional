@@ -1,0 +1,54 @@
+﻿<main class="invoices-page">
+  <header class="page-header"><div><span class="eyebrow">Contabilidad</span><h1>Facturas</h1><p>Genera facturas a partir de los pagos recibidos.</p></div><button class="primary-button" (click)="openModal()"><i class="pi pi-plus"></i> Nueva factura</button></header>
+  @if (successMessage) { <p class="success" role="status">{{ successMessage }}</p> }
+  @if (errorMessage && !isModalOpen) { <p class="form-error" role="alert">{{ errorMessage }}</p> }
+  <section class="panel filters" aria-label="Filtros de facturas">
+    <label>Año<select name="filterYear" [(ngModel)]="filterYear"><option value="">Todos los años</option>@for (year of invoiceYears; track year) { <option [value]="year">{{ year }}</option> }</select></label>
+    <label>Mes<select name="filterMonth" [(ngModel)]="filterMonth"><option value="">Todos los meses</option>@for (month of months; track month.value) { <option [value]="month.value">{{ month.label }}</option> }</select></label>
+    <label>Cliente<select name="filterClient" [(ngModel)]="filterClientId"><option [ngValue]="null">Todos los clientes</option>@for (client of invoiceClients; track client.id) { <option [ngValue]="client.id">{{ client.name }}</option> }</select></label>
+    <button type="button" class="secondary-button" (click)="clearFilters()">Limpiar filtros</button>
+  </section>
+  <section class="monthly-section" aria-labelledby="monthly-title">
+    <h2 id="monthly-title">Resumen mensual</h2>
+    <p class="hint">Importes en MXN según la fecha de factura y los filtros seleccionados.</p>
+    <div class="monthly-cards">
+      @for (summary of monthlySummaries; track summary.key) {
+        <article class="panel month-card">
+          <header><h3>{{ summary.label }}</h3><span class="invoice-count">{{ summary.count }} {{ summary.count === 1 ? 'factura' : 'facturas' }}</span></header>
+          <p class="month-total-label">Total facturado</p><p class="month-total">{{ summary.total | currency:'MXN':'symbol-narrow' }}</p>
+          <dl><div><dt>Subtotal</dt><dd>{{ summary.subtotal | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>IVA</dt><dd>{{ summary.iva | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>IVA retenido</dt><dd>{{ summary.ivaWithheld | currency:'MXN':'symbol-narrow' }}</dd></div></dl>
+        </article>
+      } @empty { <p class="empty">No hay facturas para mostrar en este periodo con los filtros seleccionados.</p> }
+    </div>
+  </section>
+  <section class="panel"><h2>Historial de facturas ({{ filteredInvoices.length }})</h2><div class="table-wrap"><table><thead><tr><th>Folio</th><th>Cliente / RFC</th><th>Fecha</th><th>Subtotal</th><th>IVA</th><th>IVA retenido</th><th>Total MXN</th><th>Nota</th><th>Detalle</th></tr></thead><tbody>
+  @for (invoice of filteredInvoices; track invoice.id) { <tr><td class="folio">{{ invoice.folio }}</td><td>{{ invoice.client }}<small>{{ invoice.rfc }}</small></td><td>{{ invoice.invoiceDate }}</td><td>{{ invoice.subtotal | currency:'MXN':'symbol-narrow' }}</td><td>{{ invoice.iva | currency:'MXN':'symbol-narrow' }}</td><td>{{ invoice.ivaWithheld | currency:'MXN':'symbol-narrow' }}</td><td><strong>{{ invoice.total | currency:'MXN':'symbol-narrow' }}</strong></td><td class="note-cell">{{ invoice.note || 'Sin nota' }}</td><td><button class="secondary-button" (click)="openDetail(invoice)" [attr.aria-label]="'Ver factura ' + invoice.folio">Ver</button></td></tr> }
+  @empty { <tr><td colspan="9" class="empty">{{ invoices.length ? 'No hay facturas con los filtros seleccionados.' : 'Aún no hay facturas. Selecciona «Nueva factura» para comenzar.' }}</td></tr> }
+  </tbody></table></div></section>
+</main>
+@if (isModalOpen) {
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="invoice-title" (keydown.escape)="isModalOpen = false">
+<header><div><h2 id="invoice-title">Nueva factura</h2><p>Selecciona los pagos que deseas facturar.</p></div><button class="secondary-button" aria-label="Cerrar" (click)="isModalOpen = false">×</button></header>
+<form (ngSubmit)="save()">
+<label>Nota (opcional)<textarea name="note" [(ngModel)]="note" rows="3" placeholder="Agrega una nota para esta factura"></textarea></label>
+<div class="form-grid"><label>Cliente<select name="client" [(ngModel)]="clientId" (ngModelChange)="onClientChange()" required><option [ngValue]="null">Selecciona un cliente</option>@for (client of clients; track client.id) { <option [ngValue]="client.id">{{ client.businessName || client.name }} — {{ client.rfc || 'Sin RFC' }}</option> }</select></label><label>Fecha de factura<input type="date" name="date" [(ngModel)]="invoiceDate" required></label></div>
+<p class="hint">RFC: {{ selectedClient?.rfc || 'Sin seleccionar' }} · El consecutivo se asigna al guardar: AAAAMMDD-000001.</p>
+<h3>Pagos disponibles</h3><div class="payment-list">@for (payment of availablePayments; track payment.id) { <label class="payment-option"><input type="checkbox" [checked]="paymentIds.includes(payment.id)" (change)="togglePayment(payment.id)"><span>{{ payment.folio }}<small>{{ payment.paymentDate }} · {{ payment.accountName }}</small></span><strong>{{ payment.amount | currency:'MXN':'symbol-narrow' }}</strong></label> } @empty { <p class="empty">{{ clientId ? 'Este cliente no tiene pagos activos pendientes de facturar.' : 'Selecciona un cliente para consultar sus pagos.' }}</p> }</div>
+<label>Tratamiento del IVA ({{ ivaRate }}%)<select name="ivaMode" [(ngModel)]="ivaMode"><option value="added">Más IVA: sumar IVA al monto de los pagos</option><option value="included">IVA incluido: desglosar IVA del monto total</option></select></label>
+<div class="totals" aria-live="polite"><p>Pagos seleccionados ({{ paymentIds.length }}) <strong>{{ amountCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p>Subtotal <strong>{{ subtotalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p>IVA ({{ ivaRate }}%) <strong>{{ ivaCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p class="grand-total">Total MXN <strong>{{ total | currency:'MXN':'symbol-narrow' }}</strong></p></div>
+@if (errorMessage) { <p class="form-error" role="alert">{{ errorMessage }}</p> }
+<footer><button type="button" class="secondary-button" (click)="isModalOpen = false">Cancelar</button><button type="submit" class="primary-button" [disabled]="saving || !paymentIds.length || !selectedClient?.rfc?.trim()">{{ saving ? 'Generando…' : 'Generar factura' }}</button></footer>
+</form></section></div>
+}
+@if (detail; as invoice) {
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" (keydown.escape)="detail = null"><header><div><h2 id="detail-title">{{ invoice.folio }}</h2><p>{{ invoice.client }} · {{ invoice.rfc }}</p></div><button class="secondary-button" aria-label="Cerrar detalle" (click)="detail = null">×</button></header>
+<div class="detail-body"><p>Fecha: {{ invoice.invoiceDate }} · Factura #{{ invoice.id }}</p><h3>Pagos facturados</h3>@for (payment of invoice.payments; track payment.id) { <p class="detail-payment"><span>{{ payment.folio }}<small>{{ payment.paymentDate }}</small></span><strong>{{ payment.amount | currency:'MXN':'symbol-narrow' }}</strong></p> }
+<p class="hint">{{ invoice.ivaMode === 'added' ? 'Más IVA' : 'IVA incluido' }} · Tasa {{ invoice.ivaRate }}%</p><div class="totals"><p>Subtotal <strong>{{ invoice.subtotal | currency:'MXN':'symbol-narrow' }}</strong></p><p>IVA <strong>{{ invoice.iva | currency:'MXN':'symbol-narrow' }}</strong></p>@if (invoice.personType === 'Moral') { <p>Retenci?n de IVA <strong>?{{ invoice.ivaWithheld | currency:'MXN':'symbol-narrow' }}</strong></p> }<p class="grand-total">Total MXN <strong>{{ invoice.total | currency:'MXN':'symbol-narrow' }}</strong></p></div><p class="hint">Generada por {{ invoice.createdBy }}</p></div>
+<form class="invoice-note" (ngSubmit)="saveNote()">
+<label>Nota (opcional)<textarea name="detailNote" [(ngModel)]="detailNote" (ngModelChange)="noteSuccess = ''" rows="3" placeholder="Agrega una nota para esta factura"></textarea></label>
+@if (noteError) { <p class="form-error" role="alert">{{ noteError }}</p> }
+@if (noteSuccess) { <p class="hint" role="status">{{ noteSuccess }}</p> }
+<footer><button type="submit" class="primary-button" [disabled]="savingNote">{{ savingNote ? 'Guardando...' : 'Guardar nota' }}</button></footer>
+</form>
+</section></div>
+}

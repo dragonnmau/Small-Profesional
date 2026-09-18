@@ -37,8 +37,32 @@
     font-weight: 700
 }
 
-.brand>i,
-.brand span span {
+.brand>span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.brand-logo {
+    display: grid;
+    flex: 0 0 2.25rem;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    overflow: hidden;
+    border-radius: .45rem;
+    background: var(--p-surface-100);
+    font-size: 1.15rem
+}
+
+.brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover
+}
+
+.brand-logo i {
     color: #1f0e77
 }
 
@@ -75,10 +99,34 @@
     display: block
 }
 
+.user-details {
+    min-width: 0;
+    flex: 1
+}
+
+.user-details strong,
+.user-details small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
 .user-profile small {
     margin-top: .15rem;
     color: var(--p-text-muted-color);
     font-size: .78rem
+}
+
+.user-profile small i {
+    width: .85rem;
+    margin-right: .15rem;
+    font-size: .7rem
+}
+
+.user-profile .user-type {
+    color: var(--p-primary-color);
+    font-weight: 700;
+    text-transform: capitalize
 }
 
 .user-actions {
@@ -171,6 +219,42 @@
     min-width: 3.3rem
 }
 
+:host-context(.app-dark) .sidebar-shell {
+    border-color: var(--p-surface-700);
+    background: var(--p-surface-900);
+}
+
+:host-context(.app-dark) .brand {
+    border-color: var(--p-surface-700);
+}
+
+:host-context(.app-dark) .brand-logo i {
+    color: #8eb4ff;
+}
+
+:host-context(.app-dark) .user-area {
+    border-color: var(--p-surface-700);
+}
+
+:host-context(.app-dark) .user-actions button {
+    border-color: var(--p-surface-600);
+}
+
+:host-context(.app-dark) .user-actions button:hover {
+    background: var(--p-surface-800);
+}
+
+:host-context(.app-dark) ::ng-deep .service-panel-menu .p-panelmenu-panel,
+:host-context(.app-dark) ::ng-deep .service-panel-menu .p-panelmenu-content,
+:host-context(.app-dark) ::ng-deep .service-panel-menu .p-menuitem-content {
+    background: transparent;
+}
+
+:host-context(.app-dark) ::ng-deep .service-panel-menu .p-menuitem-link,
+:host-context(.app-dark) ::ng-deep .service-panel-menu .p-panelmenu-header-link {
+    color: var(--p-text-color);
+}
+
 ::ng-deep .service-panel-menu .unavailable-menu-item {
     position: relative;
     margin-top: -0.1rem;
@@ -188,7 +272,7 @@
     color: #3d2900;
     background: repeating-linear-gradient(-45deg, #f8c845 0 7px, #1f1f1f 7px 12px);
     box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
-    content: 'No disponible';
+    content: 'PROXIMAMENTE';
     font-size: .58rem;
     font-weight: 800;
     letter-spacing: .9em;

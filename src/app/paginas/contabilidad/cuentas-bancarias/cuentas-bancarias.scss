@@ -1,0 +1,67 @@
+.banking-page { max-width: 1240px; margin: 0 auto; padding: 2rem clamp(1rem, 3vw, 3rem) 3rem; color: var(--p-text-color); }
+.page-header, .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.page-header { margin-bottom: 1.5rem; }
+.eyebrow { color: var(--p-primary-color); font-size: .76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.eyebrow i { margin-right: .35rem; }
+h1, h2, p { margin: 0; }
+h1 { margin-top: .4rem; font-size: clamp(1.6rem, 3vw, 2.15rem); }
+h2 { font-size: 1.05rem; }
+.page-header p, .section-heading p { margin-top: .35rem; color: var(--p-text-muted-color); font-size: .84rem; }
+.primary-button, .secondary-button, .text-button, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; border: 0; cursor: pointer; font: inherit; font-weight: 700; }
+.primary-button, .secondary-button { border-radius: 6px; padding: .72rem 1rem; font-size: .82rem; }
+.primary-button { color: #fff; background: var(--p-primary-color); }
+.primary-button:hover { filter: brightness(.94); }
+.secondary-button { border: 1px solid var(--p-surface-300); color: var(--p-text-color); background: var(--p-surface-0); }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+.summary-card { display: flex; align-items: center; gap: .8rem; padding: 1rem; border: 1px solid var(--p-surface-200); border-radius: 9px; background: var(--p-surface-0); }
+.summary-card small, .summary-card strong { display: block; }
+.summary-card small { color: var(--p-text-muted-color); font-size: .76rem; }
+.summary-card strong { margin-top: .3rem; font-size: 1.25rem; }
+.summary-icon { display: grid; place-items: center; width: 2.35rem; height: 2.35rem; border-radius: 8px; }
+.summary-icon.green { color: #047857; background: #d1fae5; }.summary-icon.blue { color: #2563eb; background: #dbeafe; }.summary-icon.amber { color: #b45309; background: #fef3c7; }
+.accounts-section, .movements-section { padding: 1.25rem; border: 1px solid var(--p-surface-200); border-radius: 10px; background: var(--p-surface-0); }
+.accounts-section { margin-bottom: 1.25rem; }
+.section-heading { padding-bottom: 1rem; border-bottom: 1px solid var(--p-surface-200); }
+.role-label { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .65rem; border-radius: 999px; color: var(--p-primary-color); background: color-mix(in srgb, var(--p-primary-color), transparent 90%); font-size: .75rem; font-weight: 700; text-transform: capitalize; }
+.account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; padding-top: 1rem; }
+.account-card { padding: 1.1rem; border: 1px solid var(--p-surface-200); border-radius: 9px; background: linear-gradient(145deg, var(--p-surface-0), var(--p-surface-100)); }
+.account-card-top { display: flex; align-items: center; gap: .65rem; }.bank-mark { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 7px; color: #fff; background: #204b85; }.account-title { min-width: 0; flex: 1; }.account-title strong, .account-title span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.account-title span { margin-top: .15rem; color: var(--p-text-muted-color); font-size: .75rem; }
+.icon-button { width: 2rem; height: 2rem; border-radius: 50%; color: var(--p-text-muted-color); background: transparent; }.icon-button:hover { color: var(--p-primary-color); background: var(--p-surface-200); }.icon-button.danger:hover { color: #dc2626; }
+.balance-label { margin-top: 1.35rem; color: var(--p-text-muted-color); font-size: .72rem; }.balance { margin-top: .25rem; font-size: 1.75rem; font-weight: 800; letter-spacing: -.02em; }.account-number { margin-top: .5rem; color: var(--p-text-muted-color); font-size: .75rem; }.account-number i { margin-right: .25rem; }
+.card-list { display: grid; gap: .35rem; margin-top: 1.1rem; padding-top: .8rem; border-top: 1px solid var(--p-surface-200); }.card-list-label { color: var(--p-text-muted-color); font-size: .7rem; font-weight: 700; text-transform: uppercase; }.debit-card { display: flex; align-items: center; gap: .35rem; padding: .4rem .5rem; border-radius: 5px; color: #fff; background: #263849; font-size: .74rem; }.debit-card small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.no-cards { color: var(--p-text-muted-color); font-size: .75rem; }
+.account-footer { display: grid; gap: .55rem; margin-top: 1rem; padding-top: .7rem; border-top: 1px solid var(--p-surface-200); }.account-footer small { color: var(--p-text-muted-color); font-size: .68rem; }.account-footer div { display: flex; gap: .7rem; }.text-button { padding: 0; color: var(--p-primary-color); background: transparent; font-size: .72rem; }.text-button:hover { text-decoration: underline; }
+.empty-state { display: grid; justify-items: center; gap: .45rem; padding: 2.5rem 1rem; color: var(--p-text-muted-color); text-align: center; }.empty-state i { font-size: 2rem; color: var(--p-primary-color); }.empty-state strong { color: var(--p-text-color); }.empty-state .secondary-button { margin-top: .5rem; }
+.table-wrap { overflow-x: auto; }.movements-section .table-wrap { padding-top: 1rem; } table { width: 100%; border-collapse: collapse; font-size: .8rem; } th { color: var(--p-text-muted-color); font-size: .7rem; font-weight: 700; text-align: left; text-transform: uppercase; } th, td { padding: .75rem .5rem; border-bottom: 1px solid var(--p-surface-200); white-space: nowrap; } td strong, td small { display: block; } td small { margin-top: .18rem; color: var(--p-text-muted-color); font-size: .7rem; }.movement-type { color: #047857; font-weight: 700; }.movement-type.expense { color: #dc2626; }.movement-type i { margin-right: .35rem; }.amount-income { color: #047857; font-weight: 700; }.amount-expense { color: #dc2626; font-weight: 700; }.empty-table { padding: 2rem; color: var(--p-text-muted-color); text-align: center; }
+.access-denied { display: grid; justify-items: center; gap: .5rem; max-width: 560px; margin: 5rem auto; padding: 3rem 1.5rem; color: var(--p-text-muted-color); text-align: center; }.access-denied i { font-size: 2.2rem; color: #dc2626; }.access-denied h1 { color: var(--p-text-color); font-size: 1.5rem; }
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgba(15, 23, 42, .48); }.modal { width: min(100%, 560px); max-height: calc(100vh - 2rem); overflow: auto; border-radius: 10px; background: var(--p-surface-0); box-shadow: 0 20px 50px rgba(15, 23, 42, .25); }.modal header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.35rem; border-bottom: 1px solid var(--p-surface-200); }.modal header p { margin-top: .35rem; color: var(--p-text-muted-color); font-size: .8rem; }.modal form { display: grid; gap: 1rem; padding: 1.35rem; }.form-grid { display: grid; gap: 1rem; }.form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }label { display: grid; gap: .4rem; color: var(--p-text-color); font-size: .78rem; font-weight: 700; }input, select { box-sizing: border-box; width: 100%; border: 1px solid var(--p-surface-300); border-radius: 6px; padding: .68rem .75rem; color: var(--p-text-color); background: var(--p-surface-0); font: inherit; font-size: .84rem; outline: none; }input:focus, select:focus { border-color: var(--p-primary-color); }.modal footer { display: flex; justify-content: flex-end; gap: .6rem; padding-top: .35rem; }
+.form-error { margin: 0; color: #dc2626; font-size: .78rem; font-weight: 700; }
+@media (max-width: 720px) { .page-header, .section-heading { flex-direction: column; }.summary-grid { grid-template-columns: 1fr; }.form-grid.two { grid-template-columns: 1fr; }.account-footer div { flex-wrap: wrap; }.primary-button { width: 100%; } }
+
+:host-context(.app-dark) .summary-card,
+:host-context(.app-dark) .accounts-section,
+:host-context(.app-dark) .movements-section,
+:host-context(.app-dark) .account-card,
+:host-context(.app-dark) .modal {
+	border-color: var(--p-surface-700);
+	background: var(--p-surface-900);
+}
+
+:host-context(.app-dark) .account-card {
+	background: linear-gradient(145deg, var(--p-surface-900), var(--p-surface-800));
+}
+
+:host-context(.app-dark) .summary-icon.green { color: #6ee7b7; background: rgba(6, 78, 59, .55); }
+:host-context(.app-dark) .summary-icon.blue { color: #93c5fd; background: rgba(30, 64, 175, .55); }
+:host-context(.app-dark) .summary-icon.amber { color: #fcd34d; background: rgba(120, 53, 15, .55); }
+:host-context(.app-dark) .bank-mark { background: #315f9d; }
+:host-context(.app-dark) .debit-card { background: #172535; }
+:host-context(.app-dark) input,
+:host-context(.app-dark) select,
+:host-context(.app-dark) .secondary-button { border-color: var(--p-surface-600); background: var(--p-surface-800); }
+:host-context(.app-dark) .icon-button:hover { background: var(--p-surface-700); }
+:host-context(.app-dark) th,
+:host-context(.app-dark) td { border-color: var(--p-surface-700); }
+.debit-card { flex-wrap: wrap; }
+.debit-card .credit-limit { flex-basis: 100%; padding-top: .25rem; font-size: .72rem; }
+.edit-card-button { border: 1px solid currentColor; background: transparent; color: inherit; padding: .25rem .4rem; border-radius: 4px; font-size: .7rem; cursor: pointer; }
+.debit-card .credit-note { display: block; margin: .2rem 0 0; white-space: normal; opacity: .8; font-size: .65rem; }
