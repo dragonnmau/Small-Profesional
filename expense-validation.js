@@ -42,4 +42,4 @@ function validateExpense(request, configuredRate) {
     createdBy: typeof request.createdBy === 'string' && request.createdBy.trim() ? request.createdBy.trim() : 'Administrador' };
 }
 
-module.exports = { validateExpense, validateCategory };
+module.exports = { validateExpense, validateCategory, validateAttachment };

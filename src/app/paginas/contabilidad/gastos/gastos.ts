@@ -26,27 +26,45 @@ export class Gastos implements OnInit {
   form = this.emptyForm();
   ivaRate = 0;
   isModalOpen = false;
+  editingExpense: DbExpense | null = null;
   saving = false;
   readingFiles = 0;
   error = '';
   fileError = '';
   success = '';
-  search = '';
+  filterYear = '';
   filterMonth = '';
   filterAccount: number | null = null;
+  filterCategory: string | null = null;
   constructor(private readonly db: Db) {}
   ngOnInit(): void { this.load(); }
-  get accountOptions() { return bankOptions(this.accounts); }
+  get accountOptions() {
+    const options = bankOptions(this.accounts);
+    const expense = this.editingExpense;
+    if (expense) {
+      const key = expense.cardId ? `card:${expense.cardId}` : `account:${expense.accountId}`;
+      if (!options.some(option => option.key === key)) options.push({ key, accountId: expense.accountId,
+        cardId: expense.cardId ?? null, label: `${expense.accountName}${expense.cardLastFour ? ' · **** ' + expense.cardLastFour : ''} (cuenta o tarjeta original)` });
+    }
+    return options;
+  }
   get accountSelection(): string { return this.form.cardId ? `card:${this.form.cardId}` : this.form.accountId ? `account:${this.form.accountId}` : ''; }
   set accountSelection(key: string) {
     const option = this.accountOptions.find(item => item.key === key);
     this.form.accountId = option?.accountId ?? 0; this.form.cardId = option?.cardId ?? null;
   }
   get filteredExpenses(): DbExpense[] {
-    const search = this.search.trim().toLocaleLowerCase();
     return this.expenses.filter(item => (!this.filterAccount || item.accountId === this.filterAccount)
-      && (!this.filterMonth || item.expenseDate.startsWith(this.filterMonth))
-      && (!search || `${item.concept} ${item.category} ${item.accountName}`.toLocaleLowerCase().includes(search)));
+      && (!this.filterYear || item.expenseDate.slice(0, 4) === this.filterYear)
+      && (!this.filterMonth || item.expenseDate.slice(5, 7) === this.filterMonth)
+      && (this.filterCategory === null || (item.category || '') === this.filterCategory));
+  }
+  get filterCategories(): string[] {
+    return [...new Set([...this.categories, ...this.expenses.map(item => item.category || '')])]
+      .sort((a, b) => a.localeCompare(b, 'es'));
+  }
+  get expenseYears(): string[] {
+    return [...new Set(this.expenses.map(item => item.expenseDate.slice(0, 4)))].sort().reverse();
   }
   get filterAccounts(): Array<{ id: number; name: string }> {
     return [...new Map([...this.accounts.map(item => ({ id: item.id, name: item.name })),
@@ -79,9 +97,25 @@ export class Gastos implements OnInit {
     return { subtotal: subtotal / 100, iva: iva / 100, total: (subtotal + iva) / 100 };
   }
   openModal(): void {
+    this.editingExpense = null;
     this.error = ''; this.fileError = ''; this.success = ''; this.load();
     this.form = this.emptyForm(); this.isModalOpen = true;
     this.addingCategory = false; this.newCategory = ''; this.categoryError = '';
+  }
+  openEdit(expense: DbExpense): void {
+    this.error = ''; this.fileError = ''; this.success = ''; this.load();
+    if (this.error) return;
+    try {
+      const ticket = expense.ticketName ? this.db.getExpenseAttachment(expense.id, 'ticket') : null;
+      const invoice = expense.invoiceName ? this.db.getExpenseAttachment(expense.id, 'invoice') : null;
+      this.form = { accountId: expense.accountId, cardId: expense.cardId, expenseDate: expense.expenseDate,
+        billingMonth: expense.billingMonth, concept: expense.concept, category: expense.category, cfdiUse: expense.cfdiUse,
+        amount: expense.ivaMode === 'included' ? expense.total : expense.subtotal, ivaMode: expense.ivaMode,
+        hasInvoice: expense.hasInvoice, ticket, invoice, createdBy: expense.createdBy };
+      if (expense.ivaMode !== 'none') this.ivaRate = expense.ivaRate;
+      this.editingExpense = expense; this.addingCategory = false; this.newCategory = ''; this.categoryError = '';
+      this.isModalOpen = true;
+    } catch (error) { this.error = this.message(error); }
   }
   closeModal(): void { if (!this.saving && !this.readingFiles) this.isModalOpen = false; }
   invoiceChanged(): void { if (!this.form.hasInvoice) { this.form.invoice = null; this.form.cfdiUse = ''; } }
@@ -141,9 +175,10 @@ export class Gastos implements OnInit {
     if (!this.billingMonths.some(month => month.value === this.form.billingMonth)) { this.error = 'Selecciona el mes de facturación.'; return; }
     this.saving = true;
     try {
-      const expense = this.db.createExpense({ ...this.form, createdBy: this.db.getAccountInformation()?.user.name || 'Administrador' });
+      const values = { ...this.form, createdBy: this.db.getAccountInformation()?.user.name || 'Administrador' };
+      const expense = this.editingExpense ? this.db.updateExpense(this.editingExpense.id, values) : this.db.createExpense(values);
       this.isModalOpen = false;
-      this.success = `Gasto #${expense.id} registrado. Se actualizó el saldo de ${expense.accountName}.`;
+      this.success = this.editingExpense ? `Gasto #${expense.id} actualizado correctamente.` : `Gasto #${expense.id} registrado. Se actualizó el saldo de ${expense.accountName}.`;
       this.load();
     } catch (error) { this.error = this.message(error); }
     finally { this.saving = false; }

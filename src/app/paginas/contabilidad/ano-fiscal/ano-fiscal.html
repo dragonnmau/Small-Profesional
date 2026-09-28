@@ -1,0 +1,52 @@
+<main class="fiscal-page">
+  <header class="page-header"><div><span class="eyebrow">Contabilidad</span><h1>Año fiscal</h1><p>Facturación mensual e importes fiscales capturados.</p></div><button type="button" class="secondary-button" (click)="load()"><i class="pi pi-refresh" aria-hidden="true"></i> Actualizar</button></header>
+  <section class="panel filters" aria-label="Seleccionar año fiscal"><label>Año fiscal<select [(ngModel)]="selectedYear" (ngModelChange)="success = ''">@for (year of years; track year) { <option [ngValue]="year">{{ year }}</option> }</select></label><p>ISR y deducciones autorizadas de captura manual. Importes en MXN.</p></section>
+  @if (success) { <p class="success" role="status">{{ success }}</p> }
+  @if (error) { <p class="error panel" role="alert">{{ error }} Usa «Actualizar» para volver a intentarlo.</p> } @else {
+    @let annual = annualTotals;
+    <section class="annual-summary" aria-label="Resumen anual">
+      <article class="panel"><span>Total facturado</span><strong>{{ annual.total / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>Totales de facturas de {{ selectedYear }}</small></article>
+      <article class="panel"><span>IVA facturado</span><strong>{{ annual.iva / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>IVA registrado en las facturas</small></article>
+      <article class="panel"><span>ISR capturado</span><strong>{{ annual.isr / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ annual.isrMonths }} de 12 meses capturados</small></article>
+      <article class="panel"><span>Deducciones autorizadas</span><strong>{{ annual.deductions / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ annual.deductionMonths }} de 12 meses capturados</small></article>
+    </section>
+    <div class="section-heading"><h2>Resumen por mes</h2><span>{{ selectedYear }} · 12 meses</span></div>
+    <section class="month-grid" aria-label="Meses del año fiscal">
+      @for (month of months; track month.month) {
+        <article class="panel month-card">
+          <header><h3>{{ month.label }}</h3><span class="count">{{ month.count }} {{ month.count === 1 ? 'factura' : 'facturas' }}</span></header>
+          <span class="amount-label">Total facturado</span><strong class="month-total">{{ month.total / 100 | currency:'MXN':'symbol-narrow' }}</strong>
+          <dl><div><dt>IVA facturado</dt><dd>{{ month.iva / 100 | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>ISR</dt><dd>@if (month.isr !== null) { {{ month.isr | currency:'MXN':'symbol-narrow' }} } @else { <span class="pending">Sin capturar</span> }</dd></div><div><dt>Deducciones autorizadas</dt><dd>@if (month.deductions !== null) { {{ month.deductions | currency:'MXN':'symbol-narrow' }} } @else { <span class="pending">Sin capturar</span> }</dd></div></dl>
+          <button type="button" class="secondary-button" (click)="openMonth(month.month)" [attr.aria-label]="'Ver detalles de ' + month.label + ' ' + selectedYear">Ver detalles <i class="pi pi-arrow-right" aria-hidden="true"></i></button>
+        </article>
+      }
+    </section>
+    <p class="data-note">La facturación y el IVA se agrupan por la fecha de cada factura. El total facturado respeta el total guardado, incluidas las retenciones registradas. ISR y deducciones muestran los importes ingresados manualmente.</p>
+  }
+</main>
+@if (detail; as month) {
+  <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="fiscal-detail-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="closeDetail()">
+    <header><div><span class="eyebrow">Detalle mensual</span><h2 id="fiscal-detail-title">{{ monthNames[month.month - 1] }} {{ month.year }}</h2></div><button type="button" class="secondary-button" aria-label="Cerrar detalle" (click)="closeDetail()" [disabled]="saving || uploadingDocument" cdkFocusInitial>×</button></header>
+    <div class="detail-body">
+      @let totals = detailTotals;
+      <div class="detail-summary"><div><span>Subtotal</span><strong>{{ totals.subtotal / 100 | currency:'MXN':'symbol-narrow' }}</strong></div><div><span>IVA facturado</span><strong>{{ totals.iva / 100 | currency:'MXN':'symbol-narrow' }}</strong></div><div><span>IVA retenido</span><strong>{{ totals.withheld / 100 | currency:'MXN':'symbol-narrow' }}</strong></div><div><span>Total facturado</span><strong>{{ totals.total / 100 | currency:'MXN':'symbol-narrow' }}</strong></div></div>
+      <form #fiscalForm="ngForm" (ngSubmit)="saveMonth()">
+        <h3>Captura manual del mes</h3><p class="hint">Deja un campo vacío si aún está pendiente; captura 0 cuando el importe sea cero.</p>
+        <div class="form-grid"><label>ISR del mes (MXN)<input type="number" name="isr" [(ngModel)]="month.isr" min="0" max="999999999.99" step="0.01" placeholder="Sin capturar"></label><label>Deducciones autorizadas (MXN)<input type="number" name="deductions" [(ngModel)]="month.deductions" min="0" max="999999999.99" step="0.01" placeholder="Sin capturar"></label></div>
+        <div class="form-grid"><label>Recargos de IVA (MXN)<input type="number" name="ivaSurcharge" [(ngModel)]="month.ivaSurcharge" min="0" max="999999999.99" step="0.01" placeholder="Sin capturar"></label><label>Recargos de ISR (MXN)<input type="number" name="isrSurcharge" [(ngModel)]="month.isrSurcharge" min="0" max="999999999.99" step="0.01" placeholder="Sin capturar"></label></div>
+        <div class="iva-paid" aria-live="polite"><div><span>IVA total pagado</span><small>IVA facturado − deducciones autorizadas + recargos de IVA</small></div><strong>@if (ivaPaidCents !== null) { {{ ivaPaidCents / 100 | currency:'MXN':'symbol-narrow' }} } @else { Completa o revisa deducciones y recargos }</strong></div>
+        <div class="iva-paid isr-paid" aria-live="polite"><div><span>ISR total con recargos</span><small>ISR del mes + recargos de ISR</small></div><strong>@if (isrPaidCents !== null) { {{ isrPaidCents / 100 | currency:'MXN':'symbol-narrow' }} } @else { Completa o revisa ISR y recargos }</strong></div>
+        <div class="iva-paid monthly-payment" aria-live="polite"><div><span>Pago total del mes</span><small>IVA total pagado + ISR total con recargos</small></div><strong>@if (monthlyPaymentCents !== null) { {{ monthlyPaymentCents / 100 | currency:'MXN':'symbol-narrow' }} } @else { Completa o revisa los importes del mes }</strong></div>
+        <label>Notas (opcional)<textarea name="note" [(ngModel)]="month.note" maxlength="2000" rows="2" placeholder="Detalle o referencia de los importes capturados"></textarea></label>
+        @if (formError) { <p class="error" role="alert">{{ formError }}</p> }
+        <footer><button type="button" class="secondary-button" (click)="closeDetail()" [disabled]="saving || uploadingDocument">Cancelar</button><button type="submit" class="primary-button" [disabled]="saving || uploadingDocument || fiscalForm.invalid">{{ saving ? 'Guardando…' : 'Guardar importes' }}</button></footer>
+      </form>
+      <app-fiscal-documents [year]="month.year" [month]="month.month" (busyChange)="uploadingDocument = $event" />
+      <h3>Facturas del mes ({{ detailInvoices.length }})</h3>
+      <div class="table-wrap"><table><thead><tr><th>Folio / cliente</th><th>Fecha</th><th>Subtotal</th><th>IVA</th><th>IVA retenido</th><th>Total</th></tr></thead><tbody>
+        @for (invoice of detailInvoices; track invoice.id) { <tr><td>{{ invoice.folio }}<small>{{ invoice.client }}</small></td><td>{{ invoice.invoiceDate }}</td><td>{{ invoice.subtotal | currency:'MXN':'symbol-narrow' }}</td><td>{{ invoice.iva | currency:'MXN':'symbol-narrow' }}</td><td>{{ invoice.ivaWithheld | currency:'MXN':'symbol-narrow' }}</td><td><strong>{{ invoice.total | currency:'MXN':'symbol-narrow' }}</strong></td></tr> }
+        @empty { <tr><td colspan="6" class="empty">No hay facturas en este mes. Puedes capturar el ISR y las deducciones.</td></tr> }
+      </tbody></table></div>
+    </div>
+  </section></div>
+}

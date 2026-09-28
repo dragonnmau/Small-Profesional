@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Db, DbClient, DbInvoice, DbPayment } from '../../../services/db';
+import { Db, DbClient, DbInvoice, DbPayment, ExpenseAttachment } from '../../../services/db';
+import { InvoiceAttachment } from './invoice-attachment';
 
 @Component({
   selector: 'app-facturas',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, InvoiceAttachment],
   templateUrl: './facturas.html',
   styleUrl: './facturas.scss'
 })
@@ -68,6 +69,12 @@ export class Facturas implements OnInit {
   errorMessage = '';
   successMessage = '';
   saving = false;
+  attachment: ExpenseAttachment | null = null;
+  detailAttachment: ExpenseAttachment | null = null;
+  readingAttachment = false;
+  attachmentDirty = false;
+  attachmentError = '';
+  attachmentSuccess = '';
   constructor(private readonly db: Db) {}
   ngOnInit(): void { try { this.reload(); } catch (error) { this.showError(error); } }
   private reload(): void {
@@ -84,12 +91,19 @@ export class Facturas implements OnInit {
   get ivaCents(): number { return this.ivaMode === 'included' ? this.amountCents - this.subtotalCents : Math.round(this.subtotalCents * this.ivaRate / 100); }
   get total(): number { return (this.subtotalCents + this.ivaCents) / 100; }
   openModal(): void {
+    this.attachment = null; this.readingAttachment = false;
     this.errorMessage = ''; this.successMessage = '';
     try { this.reload(); } catch (error) { this.showError(error); return; }
     this.clientId = null; this.paymentIds = []; this.invoiceDate = this.today(); this.note = ''; this.ivaMode = 'added'; this.isModalOpen = true;
   }
   onClientChange(): void { this.paymentIds = []; this.errorMessage = ''; }
   openDetail(invoice: DbInvoice): void {
+    this.detailAttachment = null; this.attachmentDirty = false; this.readingAttachment = false;
+    this.attachmentError = ''; this.attachmentSuccess = '';
+    if (invoice.attachmentName) {
+      try { this.detailAttachment = this.db.getInvoiceAttachment(invoice.id); }
+      catch (error) { this.attachmentError = error instanceof Error ? error.message : 'No se pudo cargar el archivo.'; }
+    }
     this.detail = invoice; this.detailNote = invoice.note || '';
     this.noteError = ''; this.noteSuccess = '';
   }
@@ -106,15 +120,25 @@ export class Facturas implements OnInit {
     } finally { this.savingNote = false; }
   }
   togglePayment(id: number): void { this.paymentIds = this.paymentIds.includes(id) ? this.paymentIds.filter(value => value !== id) : [...this.paymentIds, id]; }
+  saveAttachment(): void {
+    if (!this.detail || !this.detailAttachment || this.readingAttachment) return;
+    this.attachmentError = ''; this.attachmentSuccess = '';
+    try {
+      const updated = this.db.updateInvoiceAttachment(this.detail.id, this.detailAttachment);
+      this.detail = updated;
+      this.invoices = this.invoices.map(invoice => invoice.id === updated.id ? updated : invoice);
+      this.attachmentDirty = false; this.attachmentSuccess = 'Archivo guardado correctamente.';
+    } catch (error) { this.attachmentError = error instanceof Error ? error.message : 'No se pudo guardar el archivo.'; }
+  }
   save(): void {
-    if (this.saving) return;
+    if (this.saving || this.readingAttachment) return;
     if (!this.clientId || !this.selectedClient?.rfc?.trim() || !this.invoiceDate || !this.paymentIds.length) {
       this.errorMessage = 'Selecciona un cliente con RFC, una fecha y al menos un pago.'; return;
     }
     this.saving = true;
     try {
       const invoice = this.db.createInvoice({ clientId: this.clientId, invoiceDate: this.invoiceDate, ivaMode: this.ivaMode,
-        paymentIds: [...this.paymentIds], note: this.note, createdBy: this.db.getAccountInformation()?.user.name || 'Administrador' });
+        paymentIds: [...this.paymentIds], note: this.note, attachment: this.attachment, createdBy: this.db.getAccountInformation()?.user.name || 'Administrador' });
       this.isModalOpen = false; this.openDetail(invoice); this.successMessage = `Factura ${invoice.folio} generada correctamente.`;
       this.reload();
     } catch (error) { this.showError(error); }

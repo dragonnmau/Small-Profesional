@@ -1,0 +1,45 @@
+:host { display:block; color:var(--p-text-color); --income:#0d9488; --expense:#e07825; }
+.accounting-dashboard { max-width:1240px; margin:auto; padding:2rem clamp(1rem,3vw,3rem); }
+.page-header,.section-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.25rem; }
+h1 { margin:.4rem 0; font-size:2rem; } h2 { margin:0; font-size:1.1rem; } p { margin:0; }
+.eyebrow { color:var(--p-primary-color); font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.page-header p,.section-heading p,small,.data-note { color:var(--p-text-muted-color); font-size:.8rem; }
+.section-heading p { margin-top:.4rem; }
+.panel { padding:1.25rem; background:var(--p-content-background); border:1px solid var(--p-content-border-color); border-radius:10px; }
+.filters { display:grid; grid-template-columns:1fr 1fr 2fr; align-items:end; gap:1rem; margin-bottom:1rem; }
+label { display:grid; gap:.4rem; font-size:.85rem; font-weight:600; }
+select,button { font:inherit; border:1px solid var(--p-content-border-color); border-radius:6px; padding:.7rem; color:var(--p-text-color); background:var(--p-content-background); }
+select { width:100%; } button { cursor:pointer; font-size:.85rem; } button i { margin-right:.3rem; }
+.period { align-self:center; justify-self:end; color:var(--p-text-muted-color); font-size:.85rem; }
+.period i { margin-right:.4rem; }
+.summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-bottom:1.25rem; }
+.card-heading { display:flex; justify-content:space-between; align-items:center; gap:.5rem; font-size:.85rem; }
+.card-heading i { padding:.6rem; border-radius:8px; background:var(--p-content-hover-background); }
+.income-card .card-heading i { color:var(--income); } .expense-card .card-heading i { color:var(--expense); }
+.summary strong { display:block; font-size:clamp(1.4rem,2.5vw,2rem); margin:.6rem 0; overflow-wrap:anywhere; }
+.balance-card { border-top:3px solid var(--p-primary-color); }
+.balance-card strong,.balance { color:var(--p-primary-color); }
+.negative { color:var(--expense) !important; }
+.chart-panel { margin-bottom:1.25rem; }
+.legend { display:flex; gap:1.25rem; font-size:.8rem; }
+.legend span { display:flex; align-items:center; gap:.4rem; }
+.legend i { width:.6rem; height:.6rem; border-radius:50%; }
+.income-dot { background:var(--income); } .expense-dot { background:var(--expense); }
+.chart-scroll { overflow-x:auto; } svg { display:block; width:100%; min-width:650px; }
+.grid-line { stroke:var(--p-content-border-color); stroke-dasharray:4 4; }
+.axis-label { fill:var(--p-text-muted-color); font-size:12px; }
+.income-line,.expense-line { fill:none; stroke-width:3; stroke-linejoin:round; stroke-linecap:round; }
+.income-line { stroke:var(--income); } .expense-line { stroke:var(--expense); stroke-dasharray:7 5; }
+.income-point { fill:var(--income); } .expense-point { fill:var(--expense); }
+svg rect { cursor:pointer; } svg rect:focus { outline:2px solid var(--p-primary-color); outline-offset:2px; }
+.chart-detail { display:flex; flex-wrap:wrap; gap:.75rem; padding:.85rem; min-height:1rem; background:var(--p-content-hover-background); border-radius:6px; font-size:.8rem; }
+.empty { padding:.8rem; margin-bottom:.5rem; text-align:center; color:var(--p-text-muted-color); font-size:.85rem; }
+nav { display:flex; flex-wrap:wrap; gap:1rem; } a { color:var(--p-primary-color); font-size:.85rem; }
+.table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; font-size:.8rem; }
+th,td { text-align:right; white-space:nowrap; padding:.9rem .65rem; border-bottom:1px solid var(--p-content-border-color); }
+th:first-child,td:first-child { text-align:left; } thead th { color:var(--p-text-muted-color); } tbody th { font-weight:500; }
+tfoot { font-weight:700; background:var(--p-content-hover-background); }
+.data-note { margin-top:1rem; line-height:1.6; } .error { color:#dc2626; }
+:focus-visible { outline:2px solid var(--p-primary-color); outline-offset:3px; }
+@media(max-width:850px) { .filters { grid-template-columns:1fr 1fr; } .period { grid-column:1 / -1; justify-self:start; } }
+@media(max-width:640px) { .summary { grid-template-columns:1fr; } .page-header,.section-heading { align-items:flex-start; flex-direction:column; } .filters { grid-template-columns:1fr; } .summary strong { font-size:1.8rem; } }

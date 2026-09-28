@@ -31,13 +31,14 @@
 <header><div><h2 id="invoice-title">Nueva factura</h2><p>Selecciona los pagos que deseas facturar.</p></div><button class="secondary-button" aria-label="Cerrar" (click)="isModalOpen = false">×</button></header>
 <form (ngSubmit)="save()">
 <label>Nota (opcional)<textarea name="note" [(ngModel)]="note" rows="3" placeholder="Agrega una nota para esta factura"></textarea></label>
+<app-invoice-attachment [file]="attachment" (fileChange)="attachment = $event" (busyChange)="readingAttachment = $event" [disabled]="saving" />
 <div class="form-grid"><label>Cliente<select name="client" [(ngModel)]="clientId" (ngModelChange)="onClientChange()" required><option [ngValue]="null">Selecciona un cliente</option>@for (client of clients; track client.id) { <option [ngValue]="client.id">{{ client.businessName || client.name }} — {{ client.rfc || 'Sin RFC' }}</option> }</select></label><label>Fecha de factura<input type="date" name="date" [(ngModel)]="invoiceDate" required></label></div>
 <p class="hint">RFC: {{ selectedClient?.rfc || 'Sin seleccionar' }} · El consecutivo se asigna al guardar: AAAAMMDD-000001.</p>
 <h3>Pagos disponibles</h3><div class="payment-list">@for (payment of availablePayments; track payment.id) { <label class="payment-option"><input type="checkbox" [checked]="paymentIds.includes(payment.id)" (change)="togglePayment(payment.id)"><span>{{ payment.folio }}<small>{{ payment.paymentDate }} · {{ payment.accountName }}</small></span><strong>{{ payment.amount | currency:'MXN':'symbol-narrow' }}</strong></label> } @empty { <p class="empty">{{ clientId ? 'Este cliente no tiene pagos activos pendientes de facturar.' : 'Selecciona un cliente para consultar sus pagos.' }}</p> }</div>
 <label>Tratamiento del IVA ({{ ivaRate }}%)<select name="ivaMode" [(ngModel)]="ivaMode"><option value="added">Más IVA: sumar IVA al monto de los pagos</option><option value="included">IVA incluido: desglosar IVA del monto total</option></select></label>
 <div class="totals" aria-live="polite"><p>Pagos seleccionados ({{ paymentIds.length }}) <strong>{{ amountCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p>Subtotal <strong>{{ subtotalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p>IVA ({{ ivaRate }}%) <strong>{{ ivaCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></p><p class="grand-total">Total MXN <strong>{{ total | currency:'MXN':'symbol-narrow' }}</strong></p></div>
 @if (errorMessage) { <p class="form-error" role="alert">{{ errorMessage }}</p> }
-<footer><button type="button" class="secondary-button" (click)="isModalOpen = false">Cancelar</button><button type="submit" class="primary-button" [disabled]="saving || !paymentIds.length || !selectedClient?.rfc?.trim()">{{ saving ? 'Generando…' : 'Generar factura' }}</button></footer>
+<footer><button type="button" class="secondary-button" (click)="isModalOpen = false">Cancelar</button><button type="submit" class="primary-button" [disabled]="saving || readingAttachment || !paymentIds.length || !selectedClient?.rfc?.trim()">{{ saving ? 'Generando…' : 'Generar factura' }}</button></footer>
 </form></section></div>
 }
 @if (detail; as invoice) {
@@ -50,5 +51,13 @@
 @if (noteSuccess) { <p class="hint" role="status">{{ noteSuccess }}</p> }
 <footer><button type="submit" class="primary-button" [disabled]="savingNote">{{ savingNote ? 'Guardando...' : 'Guardar nota' }}</button></footer>
 </form>
+<section class="detail-body" aria-label="Archivo de factura">
+<h3>Archivo de factura</h3>
+<app-invoice-attachment [file]="detailAttachment" (fileChange)="detailAttachment = $event; attachmentDirty = true; attachmentSuccess = ''; attachmentError = ''" (busyChange)="readingAttachment = $event" />
+@if (attachmentError) { <p class="form-error" role="alert">{{ attachmentError }}</p> }
+@if (attachmentSuccess) { <p class="hint" role="status">{{ attachmentSuccess }}</p> }
+@if (attachmentDirty) { <p class="hint">Archivo seleccionado. Guarda para conservarlo en esta factura.</p> }
+<footer><button button type="button" class="primary-button" (click)="detail = null"> Cerrar </button>  <button type="button" class="primary-button" (click)="saveAttachment()" [disabled]="!attachmentDirty || readingAttachment">Guardar archivo</button></footer>
+</section>
 </section></div>
 }

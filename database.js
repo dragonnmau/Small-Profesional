@@ -1,5 +1,13 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const { validateEvidence } = require('./service-evidence');
+const { validateAttachment } = require('./expense-validation');
+
+function invoiceAttachment(file) {
+  if (file == null) return null;
+  if (typeof file.name !== 'string' || !/\.(pdf|xml)$/i.test(file.name)) throw new Error('Selecciona una factura PDF o XML.');
+  return validateAttachment(file, 'invoice');
+}
 
 class ClientDatabase {
   constructor(userDataPath) {
@@ -10,6 +18,53 @@ class ClientDatabase {
   }
 
   setupDatabase() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS catalog_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, normalized_name TEXT NOT NULL UNIQUE
+      );
+      CREATE TABLE IF NOT EXISTS catalog_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL CHECK (kind IN ('Producto', 'Servicio', 'Paquete')),
+        name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+        category_id INTEGER REFERENCES catalog_categories(id), sku TEXT,
+        price_cents INTEGER NOT NULL CHECK (price_cents >= 0),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS catalog_sku_unique ON catalog_items(sku COLLATE NOCASE) WHERE sku IS NOT NULL;
+      CREATE TABLE IF NOT EXISTS catalog_package_items (
+        package_id INTEGER NOT NULL REFERENCES catalog_items(id),
+        product_id INTEGER NOT NULL REFERENCES catalog_items(id),
+        quantity INTEGER NOT NULL CHECK (quantity > 0), PRIMARY KEY (package_id, product_id)
+      );
+    `);
+    if (!this.db.prepare('PRAGMA table_info(catalog_items)').all().some(column => column.name === 'quantity')) {
+      this.db.exec('ALTER TABLE catalog_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0)');
+    }
+    this.db.exec('CREATE TABLE IF NOT EXISTS catalog_sku_sequence (id INTEGER PRIMARY KEY CHECK (id = 1), value INTEGER NOT NULL)');
+    this.db.exec('INSERT OR IGNORE INTO catalog_sku_sequence (id, value) VALUES (1, 0)');
+    this.db.exec('CREATE TABLE IF NOT EXISTS catalog_units (name TEXT NOT NULL, normalized_name TEXT NOT NULL UNIQUE)');
+    for (const name of ['pieza', 'mts', 'bobina']) this.createCatalogUnit(name);
+    if (!this.db.prepare('PRAGMA table_info(catalog_items)').all().some(column => column.name === 'unit')) {
+      this.db.exec("ALTER TABLE catalog_items ADD COLUMN unit TEXT NOT NULL DEFAULT 'pieza'");
+    }
+    this.db.exec(`CREATE TABLE IF NOT EXISTS fiscal_documents (
+      year INTEGER NOT NULL, month INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('declaration', 'payment')),
+      name TEXT NOT NULL, size INTEGER NOT NULL, data BLOB NOT NULL,
+      PRIMARY KEY (year, month, kind)
+    )`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS fiscal_months (
+      year INTEGER NOT NULL CHECK (year BETWEEN 1900 AND 9999),
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      isr_cents INTEGER CHECK (isr_cents >= 0),
+      deductions_cents INTEGER CHECK (deductions_cents >= 0),
+      note TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (year, month)
+    )`);
+    const fiscalColumns = this.db.prepare('PRAGMA table_info(fiscal_months)').all();
+    if (!fiscalColumns.some(column => column.name === 'iva_surcharge_cents')) this.db.exec('ALTER TABLE fiscal_months ADD COLUMN iva_surcharge_cents INTEGER CHECK (iva_surcharge_cents >= 0)');
+    if (!fiscalColumns.some(column => column.name === 'isr_surcharge_cents')) this.db.exec('ALTER TABLE fiscal_months ADD COLUMN isr_surcharge_cents INTEGER CHECK (isr_surcharge_cents >= 0)');
     this.db.exec(`CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER NOT NULL REFERENCES bank_accounts(id),
@@ -57,6 +112,7 @@ class ClientDatabase {
     `);
 
     const invoiceColumns = this.db.prepare('PRAGMA table_info(invoices)').all();
+    if (!invoiceColumns.some(column => column.name === 'attachment')) this.db.exec('ALTER TABLE invoices ADD COLUMN attachment TEXT');
     if (!invoiceColumns.some(column => column.name === 'note')) this.db.exec("ALTER TABLE invoices ADD COLUMN note TEXT NOT NULL DEFAULT ''");
     if (!invoiceColumns.some(column => column.name === 'person_type')) this.db.exec('ALTER TABLE invoices ADD COLUMN person_type TEXT');
     if (!invoiceColumns.some(column => column.name === 'iva_withheld')) this.db.exec('ALTER TABLE invoices ADD COLUMN iva_withheld REAL NOT NULL DEFAULT 0');
@@ -221,6 +277,16 @@ class ClientDatabase {
         FOREIGN KEY (company_id) REFERENCES linked_companies(id)
       )
     `).run();
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS service_evidence (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('report', 'photos', 'extras')),
+        name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, data BLOB NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS service_evidence_service ON service_evidence(service_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS service_evidence_report ON service_evidence(service_id) WHERE kind = 'report';
+    `);
     this.db.prepare(`
       CREATE TABLE IF NOT EXISTS service_materials (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -275,6 +341,7 @@ class ClientDatabase {
     this.addServiceColumnIfMissing('time', "TEXT NOT NULL DEFAULT '09:00'");
       this.addServiceColumnIfMissing('service_paid', "VARCHAR(5) NOT NULL DEFAULT 'No'");
     this.addServiceColumnIfMissing('assigned_user_id', 'INTEGER');
+    this.addServiceColumnIfMissing('internal_comment', "TEXT NOT NULL DEFAULT ''");
     if (!this.db.prepare('PRAGMA table_info(bank_cards)').all().some(column => column.name === 'credit_limit')) this.db.exec('ALTER TABLE bank_cards ADD COLUMN credit_limit REAL');
     if (!this.db.prepare('PRAGMA table_info(bank_cards)').all().some(column => column.name === 'credit_adjustment')) this.db.exec('ALTER TABLE bank_cards ADD COLUMN credit_adjustment REAL NOT NULL DEFAULT 0');
     this.addBankAccountColumnIfMissing('status', "VARCHAR(20) NOT NULL DEFAULT 'Activa'");
@@ -356,6 +423,124 @@ class ClientDatabase {
     return this.getAccountInformation();
   }
 
+  listCatalogCategories() {
+    return this.db.prepare('SELECT id, name FROM catalog_categories ORDER BY name COLLATE NOCASE').all();
+  }
+
+  listCatalogUnits() {
+    return this.db.prepare('SELECT name FROM catalog_units ORDER BY rowid').all().map(row => row.name);
+  }
+
+  createCatalogUnit(value) {
+    if (typeof value !== 'string' || !value.trim() || value.trim().length > 50) throw new Error('Ingresa una unidad de medida de hasta 50 caracteres.');
+    const name = value.trim();
+    const normalized = name.toLocaleLowerCase('es-MX');
+    this.db.prepare('INSERT OR IGNORE INTO catalog_units (name, normalized_name) VALUES (?, ?)').run(name, normalized);
+    return this.db.prepare('SELECT name FROM catalog_units WHERE normalized_name = ?').get(normalized).name;
+  }
+
+  createCatalogCategory(value) {
+    if (typeof value !== 'string' || !value.trim() || value.trim().length > 100) throw new Error('Ingresa una categoría de hasta 100 caracteres.');
+    const name = value.trim();
+    const normalized = name.toLocaleLowerCase('es-MX');
+    this.db.prepare('INSERT OR IGNORE INTO catalog_categories (name, normalized_name) VALUES (?, ?)').run(name, normalized);
+    return this.db.prepare('SELECT id, name FROM catalog_categories WHERE normalized_name = ?').get(normalized);
+  }
+
+  updateCatalogCategory(id, value) {
+    if (!Number.isSafeInteger(id) || !this.db.prepare('SELECT id FROM catalog_categories WHERE id = ?').get(id)) throw new Error('Selecciona una categoría existente.');
+    if (typeof value !== 'string' || !value.trim() || value.trim().length > 100) throw new Error('Ingresa una categoría de hasta 100 caracteres.');
+    const name = value.trim();
+    const normalized = name.toLocaleLowerCase('es-MX');
+    if (this.db.prepare('SELECT id FROM catalog_categories WHERE normalized_name = ? AND id <> ?').get(normalized, id)) throw new Error('Ya existe una categoría con ese nombre.');
+    this.db.prepare('UPDATE catalog_categories SET name = ?, normalized_name = ? WHERE id = ?').run(name, normalized, id);
+    return { id, name };
+  }
+
+  listCatalogItems() {
+    const components = this.db.prepare(`SELECT p.package_id AS packageId, p.product_id AS productId, i.name, i.sku, i.unit, p.quantity
+      FROM catalog_package_items p JOIN catalog_items i ON i.id = p.product_id ORDER BY i.name`).all();
+    return this.db.prepare(`SELECT i.id, i.kind, i.name, i.description, i.category_id AS categoryId,
+      c.name AS category, i.sku, i.quantity, i.unit, i.price_cents / 100.0 AS price FROM catalog_items i
+      LEFT JOIN catalog_categories c ON c.id = i.category_id ORDER BY i.id DESC`).all()
+      .map(item => ({ ...item, products: components.filter(part => part.packageId === item.id)
+        .map(({ productId, name, sku, quantity, unit }) => ({ productId, name, sku, quantity, unit })) }));
+  }
+
+  createCatalogItem(request) {
+    return this.saveCatalogItem(request);
+  }
+
+  updateCatalogItem({ id, item }) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Registro inválido.');
+    return this.saveCatalogItem(item, id);
+  }
+
+  generateCatalogSku(name) {
+    const letters = typeof name === 'string' ? name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/gi, '').toUpperCase() : '';
+    if (letters.length < 3) throw new Error('Ingresa un nombre con al menos tres letras para generar el SKU.');
+    return this.db.transaction(() => {
+      let value = this.db.prepare('SELECT value FROM catalog_sku_sequence WHERE id = 1').get().value;
+      let sku;
+      do {
+        value += 1;
+        sku = `${letters.slice(0, 3)}-${String(value).padStart(4, '0')}`;
+      } while (this.db.prepare('SELECT id FROM catalog_items WHERE sku = ? COLLATE NOCASE').get(sku));
+      this.db.prepare('UPDATE catalog_sku_sequence SET value = ? WHERE id = 1').run(value);
+      return sku;
+    })();
+  }
+
+  saveCatalogItem(request, editingId = null) {
+    return this.db.transaction(() => {
+      if (editingId !== null) {
+        const previous = this.db.prepare('SELECT kind FROM catalog_items WHERE id = ?').get(editingId);
+        if (!previous) throw new Error('El registro ya no existe.');
+        if (previous.kind !== request?.kind) throw new Error('No se puede cambiar el tipo del registro.');
+      }
+      if (!request || !['Producto', 'Servicio', 'Paquete'].includes(request.kind)) throw new Error('Selecciona un tipo válido.');
+      if (typeof request.name !== 'string' || !request.name.trim() || request.name.trim().length > 150) throw new Error('Ingresa un nombre de hasta 150 caracteres.');
+      const description = request.description ?? '';
+      if (typeof description !== 'string' || description.length > 2000) throw new Error('La descripción admite hasta 2000 caracteres.');
+      const sku = request.sku == null ? null : typeof request.sku === 'string' ? request.sku.trim() || null : false;
+      if (sku === false || (sku && sku.length > 80)) throw new Error('El SKU admite hasta 80 caracteres.');
+      if (sku && this.db.prepare('SELECT id FROM catalog_items WHERE sku = ? COLLATE NOCASE AND id != ?').get(sku, editingId ?? 0)) throw new Error('Este SKU ya está registrado.');
+      const quantity = request.quantity ?? 0;
+      const requestedUnit = request.unit === undefined ? 'pieza' : request.unit;
+      if (typeof requestedUnit !== 'string') throw new Error('Selecciona una unidad de medida existente.');
+      const unit = this.db.prepare('SELECT name FROM catalog_units WHERE normalized_name = ?').get(requestedUnit.trim().toLocaleLowerCase('es-MX'))?.name;
+      if (!unit) throw new Error('Selecciona una unidad de medida existente.');
+      if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 999999) throw new Error('Ingresa una cantidad entera entre 0 y 999999.');
+      const price = request.price;
+      if (typeof price !== 'number' || !Number.isFinite(price) || price < 0 || price > 999999999.99 || Math.abs(price * 100 - Math.round(price * 100)) > 0.0001) throw new Error('Ingresa un precio válido con máximo dos decimales.');
+      const categoryId = request.categoryId ?? null;
+      if (categoryId !== null && (!Number.isSafeInteger(categoryId) || !this.db.prepare('SELECT id FROM catalog_categories WHERE id = ?').get(categoryId))) throw new Error('Selecciona una categoría existente.');
+      const products = request.products ?? [];
+      if (!Array.isArray(products) || products.length > 500) throw new Error('Revisa los productos del paquete.');
+      if (request.kind === 'Paquete' && !products.length) throw new Error('Selecciona al menos un producto para el paquete.');
+      if (request.kind !== 'Paquete' && products.length) throw new Error('Solo los paquetes pueden incluir productos.');
+      const seen = new Set();
+      for (const part of products) {
+        if (!part || !Number.isSafeInteger(part.productId) || seen.has(part.productId) || !Number.isSafeInteger(part.quantity) || part.quantity < 1 || part.quantity > 999999) throw new Error('Revisa los productos y sus cantidades.');
+        if (!this.db.prepare("SELECT id FROM catalog_items WHERE id = ? AND kind = 'Producto'").get(part.productId)) throw new Error('El paquete solo puede incluir productos existentes.');
+        seen.add(part.productId);
+      }
+      let id = editingId;
+      if (id === null) {
+        const result = this.db.prepare(`INSERT INTO catalog_items (kind, name, description, category_id, sku, price_cents, quantity, unit)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(request.kind, request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit);
+        id = Number(result.lastInsertRowid);
+      } else {
+        this.db.prepare('UPDATE catalog_items SET name = ?, description = ?, category_id = ?, sku = ?, price_cents = ?, quantity = ?, unit = ? WHERE id = ?')
+          .run(request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit, id);
+        this.db.prepare('DELETE FROM catalog_package_items WHERE package_id = ?').run(id);
+      }
+      const insert = this.db.prepare('INSERT INTO catalog_package_items (package_id, product_id, quantity) VALUES (?, ?, ?)');
+      for (const part of products) insert.run(id, part.productId, part.quantity);
+      return this.listCatalogItems().find(item => item.id === id);
+    })();
+  }
+
   listExpenseCategories() {
     return this.db.prepare('SELECT name FROM expense_categories ORDER BY rowid').all().map(row => row.name);
   }
@@ -402,12 +587,52 @@ class ClientDatabase {
           ticket: expense.ticket ? JSON.stringify(expense.ticket) : null,
           invoice: expense.invoice ? JSON.stringify(expense.invoice) : null });
       const id = Number(result.lastInsertRowid);
-      const balance = Math.round((account.balance - expense.total) * 100) / 100;
+      const affectsBalance = !this.isCreditCard(expense.cardId);
+      const balance = affectsBalance ? Math.round((account.balance - expense.total) * 100) / 100 : account.balance;
       this.db.prepare(`INSERT INTO bank_movements
         (account_id, card_id, movement_type, description, amount, balance_after, created_by)
         VALUES (?, ?, 'Egreso', ?, ?, ?, ?)`).run(expense.accountId, expense.cardId, `Gasto #${id} · ${expense.expenseDate}: ${expense.concept}`, expense.total, balance, expense.createdBy);
-      this.db.prepare(`UPDATE bank_accounts SET balance = ?, balance_updated_by = ?, balance_updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      if (affectsBalance) this.db.prepare(`UPDATE bank_accounts SET balance = ?, balance_updated_by = ?, balance_updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
         .run(balance, expense.createdBy, expense.accountId);
+      return this.listExpenses().find(item => item.id === id);
+    })();
+  }
+
+  updateExpense({ id, expense: request }) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Gasto inválido.');
+    return this.db.transaction(() => {
+      const previous = this.db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+      if (!previous) throw new Error('El gasto no existe.');
+      const { validateExpense } = require('./expense-validation');
+      const expense = validateExpense(request, previous.iva_mode === 'none' ? this.getTaxSettings().ivaRate : previous.iva_rate);
+      const sameSource = expense.accountId === previous.account_id && (request.cardId ?? null) === previous.card_id;
+      expense.cardId = sameSource ? previous.card_id : this.validateOperationCard(expense.accountId, request.cardId);
+      const account = this.db.prepare('SELECT balance, status FROM bank_accounts WHERE id = ?').get(expense.accountId);
+      if (!account || (expense.accountId !== previous.account_id && account.status !== 'Activa')) throw new Error('Selecciona una cuenta bancaria activa.');
+      const category = this.listExpenseCategories().find(name => name.toLocaleLowerCase('es-MX') === expense.category.toLocaleLowerCase('es-MX'));
+      if (!category) throw new Error('Selecciona una categoría existente o agrega una nueva.');
+      expense.category = category;
+      this.db.prepare(`UPDATE expenses SET account_id = @accountId, card_id = @cardId,
+        expense_date = @expenseDate, billing_month = @billingMonth, concept = @concept, category = @category,
+        cfdi_use = @cfdiUse, iva_mode = @ivaMode, iva_rate = @ivaRate, subtotal = @subtotal, iva = @iva,
+        total = @total, has_invoice = @hasInvoice, ticket = @ticket, invoice = @invoice WHERE id = @id`)
+        .run({ ...expense, id, hasInvoice: expense.hasInvoice ? 1 : 0,
+          ticket: expense.ticket ? JSON.stringify(expense.ticket) : null,
+          invoice: expense.invoice ? JSON.stringify(expense.invoice) : null });
+      if (!sameSource || Math.round(previous.total * 100) !== Math.round(expense.total * 100)) {
+        const movement = (accountId, cardId, type, amount, description) => {
+          const source = this.db.prepare('SELECT balance FROM bank_accounts WHERE id = ?').get(accountId);
+          if (!source) throw new Error('La cuenta original ya no existe.');
+          const affectsBalance = !this.isCreditCard(cardId);
+          const balance = affectsBalance ? (Math.round(source.balance * 100) + (type === 'Ingreso' ? 1 : -1) * Math.round(amount * 100)) / 100 : source.balance;
+          this.db.prepare(`INSERT INTO bank_movements (account_id, card_id, movement_type, description, amount, balance_after, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`).run(accountId, cardId, type, description, amount, balance, expense.createdBy);
+          if (affectsBalance) this.db.prepare('UPDATE bank_accounts SET balance = ?, balance_updated_by = ?, balance_updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            .run(balance, expense.createdBy, accountId);
+        };
+        movement(previous.account_id, previous.card_id, 'Ingreso', previous.total, `Ajuste de gasto #${id}: devolución del importe anterior`);
+        movement(expense.accountId, expense.cardId, 'Egreso', expense.total, `Gasto #${id} editado · ${expense.expenseDate}: ${expense.concept}`);
+      }
       return this.listExpenses().find(item => item.id === id);
     })();
   }
@@ -507,16 +732,21 @@ class ClientDatabase {
     return this.listBankAccounts().find(item => item.id === request.accountId);
   }
 
+  isCreditCard(cardId) {
+    return cardId != null && this.db.prepare('SELECT card_type FROM bank_cards WHERE id = ?').get(cardId)?.card_type === 'Credito';
+  }
+
   createBankMovement(movement) {
     const account = this.db.prepare('SELECT balance FROM bank_accounts WHERE id = ?').get(movement.accountId);
     if (!account) throw new Error('Cuenta bancaria no encontrada.');
-    const balanceAfter = Number(account.balance) + (movement.type === 'Ingreso' ? Number(movement.amount) : -Number(movement.amount));
+    const affectsBalance = movement.type !== 'Egreso' || !this.isCreditCard(movement.cardId);
+    const balanceAfter = Number(account.balance) + (affectsBalance ? (movement.type === 'Ingreso' ? Number(movement.amount) : -Number(movement.amount)) : 0);
     this.db.transaction(() => {
       this.db.prepare(`
         INSERT INTO bank_movements (account_id, card_id, movement_type, description, amount, balance_after, created_by)
         VALUES (@accountId, @cardId, @type, @description, @amount, @balanceAfter, @createdBy)
       `).run({ ...movement, balanceAfter });
-      this.db.prepare(`
+      if (affectsBalance) this.db.prepare(`
         UPDATE bank_accounts SET balance = ?, balance_updated_by = ?, balance_updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(balanceAfter, movement.createdBy, movement.accountId);
@@ -540,7 +770,7 @@ class ClientDatabase {
     const services = this.db.prepare(`
       SELECT s.id, s.date, s.time, s.client_id AS clientId, c.name AS client,
         s.company_id AS companyId, COALESCE(lc.name, '') AS company, s.city, s.site,
-        s.description, s.folio, s.status, s.service_paid AS servicePaid, s.service_cost AS serviceCost,
+        s.description, s.internal_comment AS internalComment, s.folio, s.status, s.service_paid AS servicePaid, s.service_cost AS serviceCost,
         s.travel_allowance AS travelAllowance, s.travel_deposit AS travelDeposit,
         COALESCE((SELECT SUM(sm.cost) FROM service_materials sm WHERE sm.service_id = s.id), 0) AS materialsCost,
         s.transport_cost AS transportCost, s.gasoline_cost AS gasolineCost,
@@ -595,7 +825,7 @@ class ClientDatabase {
   }
 
   listInvoices() {
-    return this.db.prepare(`SELECT id, folio, client_id AS clientId, client, rfc, note,
+    return this.db.prepare(`SELECT id, folio, client_id AS clientId, client, rfc, note, json_extract(attachment, '$.name') AS attachmentName,
       invoice_date AS invoiceDate, iva_mode AS ivaMode, iva_rate AS ivaRate,
       subtotal, iva, iva_withheld AS ivaWithheld, person_type AS personType, total, created_by AS createdBy, created_at AS createdAt
       FROM invoices ORDER BY id DESC`).all().map(invoice => ({ ...invoice,
@@ -606,6 +836,7 @@ class ClientDatabase {
 
   createInvoice(request) {
     return this.db.transaction(() => {
+      const attachment = invoiceAttachment(request.attachment);
       if (request.note != null && typeof request.note !== 'string') throw new Error('La nota debe ser texto.');
       const note = (request.note ?? '').trim();
       const client = this.db.prepare('SELECT name, razon_social AS businessName, rfc FROM clients WHERE id = ?').get(request.clientId);
@@ -630,7 +861,7 @@ class ClientDatabase {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(request.clientId, client.businessName || client.name, rfc,
         date, request.ivaMode, ivaRate, subtotal / 100, iva / 100, (subtotal + iva) / 100, request.createdBy || 'Administrador', note).lastInsertRowid);
       const folio = `${date.replaceAll('-', '')}-${String(id).padStart(6, '0')}`;
-      this.db.prepare('UPDATE invoices SET folio = ? WHERE id = ?').run(folio, id);
+      this.db.prepare('UPDATE invoices SET folio = ?, attachment = ? WHERE id = ?').run(folio, attachment ? JSON.stringify(attachment) : null, id);
       const insert = this.db.prepare('INSERT INTO invoice_payments (invoice_id, payment_id, folio, payment_date, amount) VALUES (?, ?, ?, ?, ?)');
       payments.forEach(payment => insert.run(id, payment.id, payment.folio, payment.paymentDate, payment.amount));
       return this.listInvoices().find(invoice => invoice.id === id);
@@ -641,6 +872,90 @@ class ClientDatabase {
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Factura inválida.');
     if (typeof note !== 'string') throw new Error('La nota debe ser texto.');
     const result = this.db.prepare('UPDATE invoices SET note = ? WHERE id = ?').run(note.trim(), id);
+    if (!result.changes) throw new Error('La factura no existe.');
+    return this.listInvoices().find(invoice => invoice.id === id);
+  }
+
+  listFiscalMonths() {
+    return this.db.prepare(`SELECT year, month, isr_cents / 100.0 AS isr,
+      deductions_cents / 100.0 AS deductions, iva_surcharge_cents / 100.0 AS ivaSurcharge,
+      isr_surcharge_cents / 100.0 AS isrSurcharge, note, updated_at AS updatedAt
+      FROM fiscal_months ORDER BY year DESC, month`).all();
+  }
+
+  validateFiscalDocumentPeriod(year, month, kind) {
+    if (!Number.isInteger(year) || year < 1900 || year > 9999 || !Number.isInteger(month) || month < 1 || month > 12) throw new Error('Selecciona un año y mes válidos.');
+    if (kind !== undefined && !['declaration', 'payment'].includes(kind)) throw new Error('Tipo de comprobante inválido.');
+  }
+
+  listFiscalDocuments({ year, month }) {
+    this.validateFiscalDocumentPeriod(year, month);
+    return this.db.prepare('SELECT kind, name, size FROM fiscal_documents WHERE year = ? AND month = ? ORDER BY kind').all(year, month);
+  }
+
+  saveFiscalDocument({ year, month, kind, file }) {
+    this.validateFiscalDocumentPeriod(year, month, kind);
+    if (!kind) throw new Error('Selecciona el tipo de comprobante.');
+    const [validated] = validateEvidence('report', [file]);
+    return this.db.transaction(() => {
+      this.db.prepare('INSERT INTO fiscal_months (year, month) VALUES (?, ?) ON CONFLICT(year, month) DO NOTHING').run(year, month);
+      this.db.prepare(`INSERT INTO fiscal_documents (year, month, kind, name, size, data) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(year, month, kind) DO UPDATE SET name = excluded.name, size = excluded.size, data = excluded.data`)
+        .run(year, month, kind, validated.name, validated.size, validated.data);
+      return this.listFiscalDocuments({ year, month });
+    })();
+  }
+
+  getFiscalDocument({ year, month, kind }) {
+    this.validateFiscalDocumentPeriod(year, month, kind);
+    if (!kind) throw new Error('Selecciona el tipo de comprobante.');
+    const file = this.db.prepare('SELECT name, data FROM fiscal_documents WHERE year = ? AND month = ? AND kind = ?').get(year, month, kind);
+    if (!file) throw new Error('Comprobante no encontrado.');
+    return { name: file.name, type: 'application/pdf', data: file.data.toString('base64') };
+  }
+
+  deleteFiscalDocument({ year, month, kind }) {
+    this.validateFiscalDocumentPeriod(year, month, kind);
+    if (!kind) throw new Error('Selecciona el tipo de comprobante.');
+    return this.db.transaction(() => {
+      const result = this.db.prepare('DELETE FROM fiscal_documents WHERE year = ? AND month = ? AND kind = ?').run(year, month, kind);
+      if (!result.changes) throw new Error('Comprobante no encontrado.');
+      return this.listFiscalDocuments({ year, month });
+    })();
+  }
+
+  saveFiscalMonth({ year, month, isr, deductions, ivaSurcharge = null, isrSurcharge = null, note }) {
+    if (!Number.isInteger(year) || year < 1900 || year > 9999 || !Number.isInteger(month) || month < 1 || month > 12) throw new Error('Selecciona un año y mes válidos.');
+    const cents = (amount, label) => {
+      if (amount === null) return null;
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0 || amount > 999999999.99 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.0001) throw new Error(`${label}: ingresa un importe no negativo con máximo dos decimales.`);
+      return Math.round(amount * 100);
+    };
+    const isrCents = cents(isr, 'ISR');
+    const deductionCents = cents(deductions, 'Deducciones');
+    const ivaSurchargeCents = cents(ivaSurcharge, 'Recargos de IVA');
+    const isrSurchargeCents = cents(isrSurcharge, 'Recargos de ISR');
+    if (typeof note !== 'string' || note.length > 2000) throw new Error('La nota debe tener máximo 2000 caracteres.');
+    this.db.prepare(`INSERT INTO fiscal_months (year, month, isr_cents, deductions_cents, iva_surcharge_cents, isr_surcharge_cents, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(year, month) DO UPDATE SET
+      isr_cents = excluded.isr_cents, deductions_cents = excluded.deductions_cents,
+      iva_surcharge_cents = excluded.iva_surcharge_cents, isr_surcharge_cents = excluded.isr_surcharge_cents,
+      note = excluded.note, updated_at = CURRENT_TIMESTAMP`).run(year, month, isrCents, deductionCents, ivaSurchargeCents, isrSurchargeCents, note.trim());
+    return this.listFiscalMonths().find(item => item.year === year && item.month === month);
+  }
+
+  getInvoiceAttachment({ id }) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Factura inválida.');
+    const row = this.db.prepare('SELECT attachment FROM invoices WHERE id = ?').get(id);
+    if (!row) throw new Error('La factura no existe.');
+    return row.attachment ? JSON.parse(row.attachment) : null;
+  }
+
+  updateInvoiceAttachment({ id, attachment }) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Factura inválida.');
+    const file = invoiceAttachment(attachment);
+    if (!file) throw new Error('Selecciona una factura PDF o XML.');
+    const result = this.db.prepare('UPDATE invoices SET attachment = ? WHERE id = ?').run(JSON.stringify(file), id);
     if (!result.changes) throw new Error('La factura no existe.');
     return this.listInvoices().find(invoice => invoice.id === id);
   }
@@ -811,17 +1126,55 @@ class ClientDatabase {
     return this.listServices().find(item => item.id === id);
   }
 
+  requireEvidenceService(serviceId) {
+    if (!Number.isSafeInteger(serviceId) || serviceId <= 0 || !this.db.prepare('SELECT 1 FROM services WHERE id = ?').get(serviceId)) throw new Error('El servicio no existe.');
+  }
+
+  listServiceEvidence({ serviceId }) {
+    this.requireEvidenceService(serviceId);
+    return this.db.prepare('SELECT id, kind, name, type, size FROM service_evidence WHERE service_id = ? ORDER BY id DESC').all(serviceId);
+  }
+
+  addServiceEvidence({ serviceId, kind, files }) {
+    const validated = validateEvidence(kind, files);
+    return this.db.transaction(() => {
+      this.requireEvidenceService(serviceId);
+      if (kind === 'report') this.db.prepare("DELETE FROM service_evidence WHERE service_id = ? AND kind = 'report'").run(serviceId);
+      const insert = this.db.prepare('INSERT INTO service_evidence (service_id, kind, name, type, size, data) VALUES (?, ?, ?, ?, ?, ?)');
+      for (const file of validated) insert.run(serviceId, kind, file.name, file.type, file.size, file.data);
+      return this.listServiceEvidence({ serviceId });
+    })();
+  }
+
+  getServiceEvidence({ serviceId, id }) {
+    this.requireEvidenceService(serviceId);
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Archivo inválido.');
+    const file = this.db.prepare('SELECT name, type, data FROM service_evidence WHERE service_id = ? AND id = ?').get(serviceId, id);
+    if (!file) throw new Error('Archivo no encontrado.');
+    return { ...file, data: file.data.toString('base64') };
+  }
+
+  deleteServiceEvidence({ serviceId, id }) {
+    return this.db.transaction(() => {
+      this.requireEvidenceService(serviceId);
+      if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Archivo inválido.');
+      const result = this.db.prepare('DELETE FROM service_evidence WHERE service_id = ? AND id = ?').run(serviceId, id);
+      if (!result.changes) throw new Error('Archivo no encontrado.');
+      return this.listServiceEvidence({ serviceId });
+    })();
+  }
+
   updateService(id, service) {
     const update = this.db.prepare(`
       UPDATE services SET date = @date, time = @time, client_id = @clientId, company_id = @companyId, city = @city,
-        site = @site, description = @description, folio = @folio, status = @status, service_paid = @servicePaid,
+        site = @site, description = @description, internal_comment = COALESCE(@internalComment, internal_comment), folio = @folio, status = @status, service_paid = @servicePaid,
         service_cost = @serviceCost, travel_allowance = @travelAllowance, travel_deposit = @travelDeposit,
         transport_cost = @transportCost, gasoline_cost = @gasolineCost, assigned_user_id = @assignedUserId, updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `);
     const replaceMaterials = this.db.prepare('INSERT INTO service_materials (service_id, name, cost) VALUES (?, ?, ?)');
     this.db.transaction(() => {
-      update.run({ ...service, id });
+      update.run({ ...service, id, internalComment: typeof service.internalComment === 'string' ? service.internalComment.trim() : null });
       this.db.prepare('DELETE FROM service_materials WHERE service_id = ?').run(id);
       service.materials.forEach(material => replaceMaterials.run(id, material.name, material.cost));
     })();

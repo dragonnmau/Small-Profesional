@@ -12,5 +12,5 @@ import {MatToolbarModule} from '@angular/material/toolbar';
   styleUrl: './app.scss'
 })
 export class App {
-  protected readonly title = signal('sm-pro');
+  protected readonly title = signal('SM-Pro');
 }

@@ -5,6 +5,7 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
   const { exportServices } = require('./services-template-export');
 
   const { exportPendingServices } = require('./pending-services-export');
+  const { exportQuotation } = require('./quotation-export');
 
     let mainWindow
   let clientDatabase
@@ -53,12 +54,34 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     ipcMain.on('collaborators:update', (event, request) => { event.returnValue = clientDatabase.updateCollaborator(request.id, request.collaborator) })
     ipcMain.on('collaborators:status', (event, request) => { clientDatabase.updateCollaboratorStatus(request); event.returnValue = true })
     for (const [channel, handler] of [
+      ['catalog:list', () => clientDatabase.listCatalogItems()],
+      ['catalog:create', request => clientDatabase.createCatalogItem(request)],
+      ['catalog:update', request => clientDatabase.updateCatalogItem(request)],
+      ['catalog:generate-sku', name => clientDatabase.generateCatalogSku(name)],
+      ['catalog:categories', () => clientDatabase.listCatalogCategories()],
+      ['catalog:units', () => clientDatabase.listCatalogUnits()],
+      ['catalog:create-unit', name => clientDatabase.createCatalogUnit(name)],
+      ['catalog:create-category', name => clientDatabase.createCatalogCategory(name)],
+      ['catalog:update-category', request => clientDatabase.updateCatalogCategory(request.id, request.name)],
       ['expenses:list', () => clientDatabase.listExpenses()],
+      ['fiscal-months:list', () => clientDatabase.listFiscalMonths()],
+      ['fiscal-months:save', request => clientDatabase.saveFiscalMonth(request)],
+      ['fiscal-documents:list', request => clientDatabase.listFiscalDocuments(request)],
+      ['fiscal-documents:save', request => clientDatabase.saveFiscalDocument(request)],
+      ['fiscal-documents:get', request => clientDatabase.getFiscalDocument(request)],
+      ['fiscal-documents:delete', request => clientDatabase.deleteFiscalDocument(request)],
+      ['services:evidence-list', request => clientDatabase.listServiceEvidence(request)],
+      ['services:evidence-add', request => clientDatabase.addServiceEvidence(request)],
+      ['services:evidence-file', request => clientDatabase.getServiceEvidence(request)],
+      ['services:evidence-delete', request => clientDatabase.deleteServiceEvidence(request)],
+      ['invoices:attachment', request => clientDatabase.getInvoiceAttachment(request)],
+      ['invoices:update-attachment', request => clientDatabase.updateInvoiceAttachment(request)],
       ['bank-accounts:update', request => clientDatabase.updateBankAccount(request)],
       ['bank-cards:update', request => clientDatabase.updateBankCard(request)],
       ['expenses:categories', () => clientDatabase.listExpenseCategories()],
       ['expenses:create-category', name => clientDatabase.createExpenseCategory(name)],
       ['expenses:create', request => clientDatabase.createExpense(request)],
+      ['expenses:update', request => clientDatabase.updateExpense(request)],
       ['expenses:attachment', request => clientDatabase.getExpenseAttachment(request)]
     ]) {
       ipcMain.on(channel, (event, request) => {
@@ -76,6 +99,10 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     ipcMain.on('bank-accounts:deactivate', (event, request) => { clientDatabase.deactivateBankAccount(request); event.returnValue = true })
     ipcMain.on('bank-movements:create', (event, movement) => { event.returnValue = clientDatabase.createBankMovement(movement) })
     ipcMain.on('payments:clients', event => { event.returnValue = clientDatabase.listPaymentClients() })
+    ipcMain.handle('quotations:export', async (event, options) => {
+      try { return { value: await exportQuotation(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
+      catch (error) { return { error: error.message }; }
+    });
     ipcMain.handle('payments:export-pending', async (event, options) => {
       try { return { value: await exportPendingServices(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
       catch (error) { return { error: error.message || 'No se pudieron exportar los servicios.' }; }

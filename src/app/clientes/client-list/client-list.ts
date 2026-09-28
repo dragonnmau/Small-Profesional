@@ -9,7 +9,10 @@ interface Client { id: number; kind: ClientKind; name: string; businessName: str
 interface ClientForm extends Omit<Client, 'id' | 'kind' | 'status'> {}
 interface CompanyForm { name: string; businessName: string; contact: string; phone: string; email: string; }
 
-const initialClients: NewDbClient[] = [];
+const initialClients: NewDbClient[] = [
+ {kind:'Cliente', name:'Público en General', businessName:'Público en General', rfc:'XAXX010101000', personType:'Fisica', taxRegime:'Sin Obligaciones Fiscales', address:'Sin Direccion', postalCode:'00001', contact:'N/A', phone:'N/A', email:'N/A',status:'Activo'},
+];
+//const initialCompany:
 
 @Component({ selector: 'app-client-list', imports: [CommonModule, FormsModule], templateUrl: './client-list.html', styleUrl: './client-list.scss' })
 export class ClientList {

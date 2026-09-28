@@ -173,11 +173,10 @@ export class Sidemenu implements OnInit {
                 items: [
                     {
                         label: 'General',
-                        icon: 'pi pi-cog',
-                        badge: 'No disponible',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true,
-                        shortcut: '⌘+O'
+                        icon: 'pi pi-cog', 
+                        command: () => {
+                            this.router.navigate(['/DashboardConta']);
+                        }
                     },
                     {
                         label: 'Cuentas Bancarias',
@@ -216,7 +215,13 @@ export class Sidemenu implements OnInit {
                         disabled: true
                     },
                     {
-                        label: 'Calculadora de impuestos',
+                        label: 'Año Fiscal',
+                        icon: 'pi pi-chart-bar',
+                        shortcut: '⌘+Q',
+                        command: () => { this.router.navigate(['/ano-fiscal']); }
+                    },
+                    {
+                        label: 'Calculadora de IVA',
                         icon: 'pi pi-calculator',
                         shortcut: '⌘+Q',
                         command: () => {
@@ -227,11 +232,19 @@ export class Sidemenu implements OnInit {
                 ]
             },
             {
-                label: 'Inventarios',
+                label: 'Ventas',
                 icon: 'pi pi-home',
                 items: [
                     {
-                        label: 'Productos',
+                        label: 'Productos & Servicios',
+                        icon: 'pi pi-chart-line',
+                        shortcut: '⌘+I',
+                        command: () => {
+                            this.router.navigate(['/productosyServicios']);
+                        }
+                    },
+                    {
+                        label: 'Inventarios',
                         icon: 'pi pi-chart-line',
                         shortcut: '⌘+I',
                         badge: 'No disponible',
@@ -240,6 +253,14 @@ export class Sidemenu implements OnInit {
                     },
                     {
                         label: 'Cotizador',
+                        icon: 'pi pi-chart-line',
+                        shortcut: '⌘+I',
+                        command: () => {
+                            this.router.navigate(['/cotizador']);
+                        }
+                    },
+                    {
+                        label: 'Punto de Venta',
                         icon: 'pi pi-chart-line',
                         shortcut: '⌘+I',
                         badge: 'No disponible',

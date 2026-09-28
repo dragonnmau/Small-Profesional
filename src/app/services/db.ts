@@ -1,6 +1,17 @@
 import { Injectable } from '@angular/core';
 import expenseCatalogs from './expense-catalogs.json';
 
+export interface DbCatalogCategory { id: number; name: string; }
+export interface NewDbCatalogItem {
+  kind: 'Producto' | 'Servicio' | 'Paquete'; name: string; description: string;
+  categoryId: number | null; sku: string; price: number; quantity: number; unit: string;
+  products: { productId: number; quantity: number }[];
+}
+export interface DbCatalogItem extends Omit<NewDbCatalogItem, 'sku' | 'products'> {
+  id: number; category: string | null; sku: string | null;
+  products: { productId: number; quantity: number; name: string; sku: string | null; unit: string }[];
+}
+
 export interface DbClient {
   id: number;
   kind: 'Cliente' | 'Empresa';
@@ -143,6 +154,7 @@ export interface DbService {
   folio: string;
   status: string;
   servicePaid: string;
+  internalComment?: string;
   serviceCost: number;
   travelAllowance: number;
   travelDeposit: string;
@@ -155,6 +167,11 @@ export interface DbService {
 }
 
 export interface ExpenseAttachment { name: string; type: string; data: string; }
+export interface FiscalMonth { year: number; month: number; isr: number | null; deductions: number | null; ivaSurcharge?: number | null; isrSurcharge?: number | null; note: string; updatedAt?: string; }
+export type FiscalDocumentKind = 'declaration' | 'payment';
+export interface FiscalDocument { kind: FiscalDocumentKind; name: string; size: number; }
+export type ServiceEvidenceKind = 'report' | 'photos' | 'extras';
+export interface ServiceEvidence { id: number; kind: ServiceEvidenceKind; name: string; type: string; size: number; }
 export interface NewDbExpense {
   cardId?: number | null;
   category: string; cfdiUse: string; billingMonth: string;
@@ -173,8 +190,9 @@ export interface DbPaymentService { id: number; date: string; time: string; clie
 export interface DbPayment { cardId?: number | null; cardType?: string | null; cardLastFour?: string | null; id: number; clientId: number; client: string; accountId: number; accountName: string; bank: string; paymentDate: string; invoiceNumber: string; invoiceId: number | null; invoiceFolio: string | null; folio: string; amount: number; status: 'Activo' | 'Revertido'; createdBy: string; createdAt: string; revertedBy: string | null; revertedAt: string | null; }
 export interface DbPaidService { id: number; folio: string; description: string; date: string; site: string; company: string; amount: number; }
 export interface NewDbPayment { cardId?: number | null; clientId: number; accountId: number; paymentDate: string; serviceIds: number[]; createdBy: string; }
-export interface NewDbInvoice { clientId: number; invoiceDate: string; ivaMode: 'added' | 'included'; paymentIds: number[]; createdBy: string; note?: string; }
-export interface DbInvoice extends Omit<NewDbInvoice, 'paymentIds'> {
+export interface NewDbInvoice { clientId: number; invoiceDate: string; ivaMode: 'added' | 'included'; paymentIds: number[]; createdBy: string; note?: string; attachment?: ExpenseAttachment | null; }
+export interface DbInvoice extends Omit<NewDbInvoice, 'paymentIds' | 'attachment'> {
+  attachmentName?: string | null;
   id: number; folio: string; client: string; rfc: string; ivaRate: number;
   subtotal: number; iva: number; ivaWithheld: number; personType: 'Fisica' | 'Moral' | null; total: number; createdAt: string;
   payments: Array<Pick<DbPayment, 'id' | 'folio' | 'paymentDate' | 'amount'>>;
@@ -193,8 +211,24 @@ interface ElectronWindow extends Window {
   electronDb?: ElectronDbBridge;
 }
 
+export interface QuotationExportOptions {
+  format: 'pdf' | 'png';
+  clientId: number | null;
+  temporaryName: string;
+  lines: { itemId: number; quantity: number; cost: number }[];
+  payment: string;
+  delivery: string;
+  warranty: string;
+  validityDays: number;
+  tax: '16' | 'exempt' | 'none';
+  hideTax: boolean;
+  serviceDetails: string;
+  margin: number;
+}
+
 interface ElectronDbBridge {
-  exportPendingServices(options: { clientId: number; serviceIds: number[]; format: 'pdf' | 'xlsx' }): Promise<{ value?: string | null; error?: string }>;
+  exportQuotation(options: QuotationExportOptions): Promise<{ value?: string | null; error?: string }>;
+  exportPendingServices(options: { clientId: number; serviceIds: number[]; format: 'pdf' | 'xlsx' | 'png' }): Promise<{ value?: string | null; error?: string }>;
   sendSync<T>(channel: string, payload?: unknown): T;
 }
 
@@ -329,6 +363,51 @@ export class Db {
     return this.request<DbBankAccount>('bank-movements:create', movement);
   }
 
+  listCatalogItems(): DbCatalogItem[] {
+    if (!this.ipcRenderer) return [];
+    return this.catalogRequest<DbCatalogItem[]>('catalog:list');
+  }
+
+  listCatalogCategories(): DbCatalogCategory[] {
+    if (!this.ipcRenderer) return [];
+    return this.catalogRequest<DbCatalogCategory[]>('catalog:categories');
+  }
+
+  listCatalogUnits(): string[] {
+    if (!this.ipcRenderer) return ['pieza', 'mts', 'bobina'];
+    return this.catalogRequest<string[]>('catalog:units');
+  }
+
+  createCatalogUnit(name: string): string {
+    return this.catalogRequest<string>('catalog:create-unit', name);
+  }
+
+  createCatalogItem(item: NewDbCatalogItem): DbCatalogItem {
+    return this.catalogRequest<DbCatalogItem>('catalog:create', item);
+  }
+
+  updateCatalogItem(id: number, item: NewDbCatalogItem): DbCatalogItem {
+    return this.catalogRequest<DbCatalogItem>('catalog:update', { id, item });
+  }
+
+  generateCatalogSku(name: string): string {
+    return this.catalogRequest<string>('catalog:generate-sku', name);
+  }
+
+  createCatalogCategory(name: string): DbCatalogCategory {
+    return this.catalogRequest<DbCatalogCategory>('catalog:create-category', name);
+  }
+  updateCatalogCategory(id: number, name: string): DbCatalogCategory {
+    return this.catalogRequest<DbCatalogCategory>('catalog:update-category', { id, name });
+  }
+
+  private catalogRequest<T>(channel: string, payload?: unknown): T {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para guardar el catálogo.');
+    const result = this.request<{ value: T; error?: string }>(channel, payload);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+
   listExpenseCategories(): string[] {
     if (!this.ipcRenderer) return [...expenseCatalogs.categories];
     return this.expenseRequest<string[]>('expenses:categories');
@@ -345,6 +424,9 @@ export class Db {
 
   createExpense(expense: NewDbExpense): DbExpense {
     return this.expenseRequest<DbExpense>('expenses:create', expense);
+  }
+  updateExpense(id: number, expense: NewDbExpense): DbExpense {
+    return this.expenseRequest<DbExpense>('expenses:update', { id, expense });
   }
 
   getExpenseAttachment(id: number, kind: 'ticket' | 'invoice'): ExpenseAttachment {
@@ -402,6 +484,53 @@ export class Db {
   updateInvoiceNote(id: number, note: string): DbInvoice {
     if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para guardar la nota.');
     const result = this.request<{ value: DbInvoice; error?: string }>('invoices:update-note', { id, note });
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+
+  listFiscalMonths(): FiscalMonth[] {
+    if (!this.ipcRenderer) return [];
+    const result = this.request<{ value: FiscalMonth[]; error?: string }>('fiscal-months:list');
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+
+  saveFiscalMonth(month: FiscalMonth): FiscalMonth {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para guardar los importes del mes.');
+    const result = this.request<{ value: FiscalMonth; error?: string }>('fiscal-months:save', month);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+
+  private fiscalDocumentRequest<T>(channel: string, payload: unknown): T {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para administrar los comprobantes.');
+    const result = this.request<{ value: T; error?: string }>(channel, payload);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+  listFiscalDocuments(year: number, month: number): FiscalDocument[] {
+    return this.fiscalDocumentRequest('fiscal-documents:list', { year, month });
+  }
+  saveFiscalDocument(year: number, month: number, kind: FiscalDocumentKind, file: ExpenseAttachment): FiscalDocument[] {
+    return this.fiscalDocumentRequest('fiscal-documents:save', { year, month, kind, file });
+  }
+  getFiscalDocument(year: number, month: number, kind: FiscalDocumentKind): ExpenseAttachment {
+    return this.fiscalDocumentRequest('fiscal-documents:get', { year, month, kind });
+  }
+  deleteFiscalDocument(year: number, month: number, kind: FiscalDocumentKind): FiscalDocument[] {
+    return this.fiscalDocumentRequest('fiscal-documents:delete', { year, month, kind });
+  }
+
+  getInvoiceAttachment(id: number): ExpenseAttachment | null {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para consultar el archivo.');
+    const result = this.request<{ value: ExpenseAttachment | null; error?: string }>('invoices:attachment', { id });
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+
+  updateInvoiceAttachment(id: number, attachment: ExpenseAttachment): DbInvoice {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para guardar el archivo.');
+    const result = this.request<{ value: DbInvoice; error?: string }>('invoices:update-attachment', { id, attachment });
     if (result.error) throw new Error(result.error);
     return result.value;
   }
@@ -464,6 +593,25 @@ export class Db {
     return this.request<DbService[]>('services:list');
   }
 
+  private evidenceRequest<T>(channel: string, payload: unknown): T {
+    if (!this.ipcRenderer) throw new Error('Abre la aplicación de escritorio para consultar y subir evidencias.');
+    const result = this.request<{ value: T; error?: string }>(channel, payload);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+  listServiceEvidence(serviceId: number): ServiceEvidence[] {
+    return this.evidenceRequest<ServiceEvidence[]>('services:evidence-list', { serviceId });
+  }
+  addServiceEvidence(serviceId: number, kind: ServiceEvidenceKind, files: ExpenseAttachment[]): ServiceEvidence[] {
+    return this.evidenceRequest<ServiceEvidence[]>('services:evidence-add', { serviceId, kind, files });
+  }
+  getServiceEvidence(serviceId: number, id: number): ExpenseAttachment {
+    return this.evidenceRequest<ExpenseAttachment>('services:evidence-file', { serviceId, id });
+  }
+  deleteServiceEvidence(serviceId: number, id: number): ServiceEvidence[] {
+    return this.evidenceRequest<ServiceEvidence[]>('services:evidence-delete', { serviceId, id });
+  }
+
   createService(service: NewDbService): DbService {
     if (!this.ipcRenderer) {
       const client = this.fallbackClients.find(item => item.id === service.clientId);
@@ -511,7 +659,14 @@ export class Db {
     return result.value ?? null;
   }
 
-  async exportPendingServices(clientId: number, serviceIds: number[], format: 'pdf' | 'xlsx'): Promise<string | null> {
+  async exportQuotation(options: QuotationExportOptions): Promise<string | null> {
+    if (!this.ipcRenderer?.exportQuotation) throw new Error('Abre o reinicia la aplicación de escritorio para exportar cotizaciones.');
+    const result = await this.ipcRenderer.exportQuotation(options);
+    if (result.error) throw new Error(result.error);
+    return result.value ?? null;
+  }
+
+  async exportPendingServices(clientId: number, serviceIds: number[], format: 'pdf' | 'xlsx' | 'png'): Promise<string | null> {
     if (!this.ipcRenderer) throw new Error('La exportación está disponible en la aplicación de escritorio.');
     const result = await this.ipcRenderer.exportPendingServices({ clientId, serviceIds, format });
     if (result.error) throw new Error(result.error);

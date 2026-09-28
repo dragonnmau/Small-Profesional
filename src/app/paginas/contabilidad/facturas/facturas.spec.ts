@@ -21,6 +21,27 @@ describe('Facturas', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('carga el adjunto al abrir detalles y conserva la selección si falla el guardado', () => {
+    const db = TestBed.inject(Db);
+    const file = { name: 'factura.xml', type: 'application/xml', data: btoa('<Comprobante/>') };
+    const invoice = { id: 1, attachmentName: file.name, note: 'Nota', payments: [] } as unknown as DbInvoice;
+    spyOn(db, 'getInvoiceAttachment').and.returnValue(file);
+    const update = spyOn(db, 'updateInvoiceAttachment').and.throwError('No se pudo guardar');
+    component.invoices = [invoice];
+    component.openDetail(invoice);
+    expect(component.detailAttachment).toEqual(file);
+    component.attachmentDirty = true;
+    component.saveAttachment();
+    expect(component.attachmentError).toBe('No se pudo guardar');
+    expect(component.attachmentDirty).toBeTrue();
+    expect(component.detailAttachment).toEqual(file);
+    update.and.returnValue(invoice);
+    component.saveAttachment();
+    expect(component.attachmentError).toBe('');
+    expect(component.attachmentDirty).toBeFalse();
+    expect(component.attachmentSuccess).toContain('guardado');
+  });
 });
 
 describe('Resumen mensual y filtros de facturas', () => {

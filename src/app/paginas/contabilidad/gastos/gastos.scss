@@ -18,7 +18,7 @@
 .eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; font-weight: 700; color: var(--p-primary-color); }
 .page-header p, .modal header p, small, .summary span { color: var(--p-text-muted-color); font-size: .8rem; } small { display: block; margin-top: .3rem; }
 .panel, .modal { background: var(--p-content-background); border: 1px solid var(--p-content-border-color); border-radius: 10px; } .panel { padding: 1.25rem; }
-.filters { display: grid; grid-template-columns: 2fr 1fr 1.5fr auto; align-items: end; gap: 1rem; margin-bottom: 1rem; }
+.filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 1rem; margin-bottom: 1rem; }
 .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; } .summary strong { display: block; font-size: 1.8rem; color: var(--p-primary-color); margin-top: .6rem; overflow-wrap: anywhere; }
 button, input, select, textarea { font: inherit; } button { cursor: pointer; border-radius: 6px; padding: .7rem 1rem; font-size: .85rem; font-weight: 600; } button:disabled { opacity: .5; cursor: not-allowed; }
 .primary-button { background: var(--p-primary-color); color: var(--p-primary-contrast-color, #fff); border: 1px solid var(--p-primary-color); }

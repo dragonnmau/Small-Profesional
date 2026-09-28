@@ -1,0 +1,5 @@
+{
+  "report": { "label": "Reporte de servicio", "icon": "pi pi-file-pdf", "extensions": ["pdf"] },
+  "photos": { "label": "Evidencias fotográficas", "icon": "pi pi-images", "extensions": ["jpg", "jpeg", "png", "webp", "gif"] },
+  "extras": { "label": "Evidencias extras", "icon": "pi pi-paperclip", "extensions": ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "txt", "csv", "rtf", "xml"] }
+}

@@ -1,0 +1,86 @@
+<main class="quote-page">
+  <header class="page-header"><div><span class="eyebrow">Ventas</span><h1>Cotizador</h1><p>Prepara una cotización y personaliza sus condiciones.</p></div><span class="badge"><i class="pi pi-file-edit" aria-hidden="true"></i> Nueva cotización</span></header>
+  @if (loadError) { <p class="error" role="alert">{{ loadError }}</p> }
+  <div class="workspace"><div class="editor">
+    <section class="panel" aria-labelledby="client-title">
+      <h2 id="client-title"><span class="step">1</span> Cliente</h2>
+      <div class="form-grid">
+        <label>Seleccionar cliente<select [(ngModel)]="clientId"><option [ngValue]="null">Público en General</option>@for (client of clients; track client.id) { <option [ngValue]="client.id">{{ client.name }}</option> }</select></label>
+        @if (isGeneralPublic) { <label>Nombre temporal <span class="optional">Opcional</span><input [(ngModel)]="temporaryName" maxlength="200" placeholder="Nombre para esta cotización"><small>No modifica el registro del cliente.</small></label> }
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="items-title">
+      <div class="panel-heading"><h2 id="items-title"><span class="step">2</span> Conceptos</h2><small>{{ lines.length }} conceptos</small></div>
+      <div class="form-grid concept-filters">
+        <label>Buscar en catálogo<input [(ngModel)]="search" (ngModelChange)="selectedItemId = null" placeholder="Nombre, descripción o SKU" type="search"></label>
+        <label>Tipo<select [(ngModel)]="kind" (ngModelChange)="selectedItemId = null"><option value="">Todos</option><option>Producto</option><option>Servicio</option><option>Paquete</option></select></label>
+        <label>Categoría<select [(ngModel)]="categoryFilter" (ngModelChange)="selectedItemId = null"><option value="all">Todas las categorías</option><option value="none">Sin categoría</option>@for (category of categories; track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }</select></label>
+      </div>
+      <div class="picker"><label>Producto, servicio o paquete<select [(ngModel)]="selectedItemId"><option [ngValue]="null">Selecciona un concepto</option>@for (item of filteredItems; track item.id) { <option [ngValue]="item.id">{{ item.kind }} · {{ item.name }} — {{ item.unit }} — {{ item.price | currency:'MXN':'symbol-narrow':'1.2-2' }}</option> }</select></label><button class="primary" type="button" (click)="addItem()" [disabled]="selectedItemId === null"><i class="pi pi-plus" aria-hidden="true"></i> Agregar</button></div>
+      @if (!items.length && !loadError) { <p class="catalog-note">Tu catálogo está vacío. <a routerLink="/productosyServicios">Registra productos, servicios o paquetes</a> para cotizarlos.</p> }
+      @else if (!filteredItems.length) { <p class="catalog-note">No hay conceptos que coincidan con la búsqueda.</p> }
+      @if (lines.length) {
+        <div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Costo unitario</th><th class="amount">Importe con margen</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
+          @for (line of lines; track line.item.id) {
+            <tr><td class="item-name"><strong>{{ line.item.name }}</strong><small>{{ line.item.kind }} · {{ line.item.unit }}</small>
+              @if (line.item.kind === 'Paquete') { <details><summary>Contenido del paquete</summary><ul>@for (part of line.item.products; track part.productId) { <li>{{ part.quantity }} {{ part.unit }} · {{ part.name }}</li> }</ul></details> }
+            </td><td><input type="number" class="quantity" [(ngModel)]="line.quantity" min="0.01" max="999999" step="0.01" required [attr.aria-label]="'Cantidad de ' + line.item.name" [attr.aria-invalid]="!validQuantity(line.quantity)"></td>
+            <td><input type="number" class="cost" [(ngModel)]="line.cost" min="0" max="999999999" step="0.01" required [attr.aria-label]="'Costo unitario de ' + line.item.name" [attr.aria-invalid]="!validCost(line.cost)"></td>
+            <td class="amount">{{ validMargin && validQuantity(line.quantity) && validCost(line.cost) ? (linePrice(line) | currency:'MXN':'symbol-narrow':'1.2-2') : '—' }}</td><td><button class="icon-button" type="button" (click)="removeLine(line)" [attr.aria-label]="'Eliminar ' + line.item.name"><i class="pi pi-trash" aria-hidden="true"></i></button></td></tr>
+          }
+        </tbody></table></div><small>Los costos editados aplican únicamente a esta cotización.</small>
+      } @else { <div class="empty"><i class="pi pi-shopping-bag" aria-hidden="true"></i><strong>Agrega tu primer concepto</strong><p>Combina productos, servicios y paquetes en una cotización.</p></div> }
+      @if (!validAmounts) { <p class="error" role="alert">Revisa las cantidades (mayores que 0 y hasta 999,999), los costos (de 0 a 999,999,999) y el margen (de 0 a 99.99%).</p> }
+    </section>
+    <section class="panel" aria-labelledby="terms-title">
+      <h2 id="terms-title"><span class="step">3</span> Condiciones de la cotización</h2>
+      <div class="form-grid">
+        <label>Condiciones de pago<select [(ngModel)]="payment">@for (option of paymentOptions; track option) { <option>{{ option }}</option> }</select></label>
+        <label>Plazo de entrega<select [(ngModel)]="delivery">@for (option of deliveryOptions; track option) { <option>{{ option }}</option> }</select></label>
+        <label>Garantía<select [(ngModel)]="warranty">@for (option of warrantyOptions; track option) { <option>{{ option }}</option> }</select></label>
+        <label>Validez de la cotización (días)<input type="number" [(ngModel)]="validityDays" min="1" max="365" step="1" required [attr.aria-invalid]="!validValidity">@if (expirationDate; as expiration) { <small>Válida hasta el {{ expiration | date:'dd/MM/yyyy' }}.</small> } @else { <small class="error">Ingresa entre 1 y 365 días enteros.</small> }</label>
+        <label>IVA<select [(ngModel)]="tax"><option value="16">IVA 16%</option><option value="exempt">Exento</option><option value="none">Sin IVA</option></select></label>
+        <label>Margen de ganancia (%)<input type="number" [(ngModel)]="margin" min="0" max="99.99" step="0.01" required [attr.aria-invalid]="!validMargin"><small>Sobre el precio de venta: costo ÷ (1 − margen / 100).</small></label>
+      </div>
+      <label class="check"><input type="checkbox" [(ngModel)]="hideTax"> Ocultar el desglose del IVA en el resumen</label><small>El IVA seleccionado sigue incluido en el total aunque se oculte.</small>
+      <label class="service-details">Detalles del servicio <span class="optional">Opcional</span><textarea [(ngModel)]="serviceDetails" rows="4" maxlength="5000" placeholder="Describe el alcance, actividades o consideraciones del servicio…"></textarea></label>
+    </section>
+  </div>
+  <aside class="panel summary" aria-labelledby="summary-title">
+    <span class="eyebrow">Vista previa</span><h2 id="summary-title">Resumen de cotización</h2><p class="recipient">{{ clientName }}</p>
+    @if (isGeneralPublic && temporaryName.trim()) { <small>Público en general</small> }
+    @if (validAmounts) {
+      <dl class="totals">
+        @if (!hideTax) { <div><dt>Subtotal</dt><dd>{{ subtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div><div><dt>{{ tax === '16' ? 'IVA (16%)' : tax === 'exempt' ? 'IVA exento' : 'Sin IVA' }}</dt><dd>{{ taxAmount | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div> }
+        <div class="grand-total"><dt>Total <small>MXN</small></dt><dd>{{ total | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div>
+        @if (payment === 'Anticipo de 50%') { <div class="advance-payment"><dt>Anticipo del 50%</dt><dd>{{ advancePayment | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div> }
+      </dl>
+      @if (installments; as payments) {
+        @if (payments.length) {
+          <details class="installment-plan">
+            <summary>Mensualidad de {{ payments[0].amount | currency:'MXN':'symbol-narrow':'1.2-2' }} <span>· {{ installmentMonths }} meses</span></summary>
+            <dl aria-label="Desglose de mensualidades">
+              @for (installment of payments; track installment.month) {
+                <div><dt>Mes {{ installment.month }}</dt><dd>{{ installment.amount | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div>
+              }
+            </dl>
+            @if (payments[payments.length - 1].amount !== payments[0].amount) {
+              <small>La última mensualidad incluye el ajuste de centavos.</small>
+            }
+          </details>
+        }
+      }
+    } @else { <p class="error">Corrige los importes para calcular el total.</p> }
+    <dl class="terms"><div><dt>Pago</dt><dd>{{ payment }}</dd></div><div><dt>Entrega</dt><dd>{{ delivery }}</dd></div><div><dt>Garantía</dt><dd>{{ warranty }}</dd></div><div><dt>Validez</dt><dd>{{ validValidity ? validityDays + ' días' : 'Por definir' }}</dd></div></dl>
+    @if (serviceDetails.trim()) { <div class="details-preview"><h3>Detalles del servicio</h3><p>{{ serviceDetails }}</p></div> }
+    <div class="internal"><h3>Cálculo interno</h3><small>No forma parte del resumen para el cliente.</small>@if (validAmounts) { <dl><div><dt>Costo base</dt><dd>{{ baseCost | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div><div><dt>Ganancia ({{ margin }}%)</dt><dd>{{ profit | currency:'MXN':'symbol-narrow':'1.2-2' }}</dd></div></dl> }</div>
+    <div class="export-actions">
+      <label>Formato de exportación<select [(ngModel)]="exportFormat" [disabled]="exporting"><option value="pdf">PDF</option><option value="png">Imagen PNG</option></select></label>
+      <button class="primary" type="button" (click)="exportQuotation()" [disabled]="!canExport || exporting"><i [class]="exporting ? 'pi pi-spin pi-spinner' : 'pi pi-download'" aria-hidden="true"></i>{{ exporting ? 'Exportando…' : 'Exportar cotización' }}</button>
+      @if (!lines.length) { <small>Agrega al menos un concepto para exportar.</small> }
+      @if (exportError) { <p class="error" role="alert">{{ exportError }}</p> }
+      @if (exportMessage) { <p class="export-message" role="status">{{ exportMessage }}</p> }
+    </div>
+    <small class="draft-note">La exportación guarda el archivo; la cotización no se registra en un historial.</small>
+  </aside></div>
+</main>

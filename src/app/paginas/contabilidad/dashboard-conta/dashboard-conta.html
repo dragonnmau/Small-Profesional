@@ -1,0 +1,62 @@
+<main class="accounting-dashboard">
+  <header class="page-header">
+    <div><span class="eyebrow">Contabilidad</span><h1>Resumen contable</h1><p>Consulta los ingresos y egresos de tu negocio.</p></div>
+    <button type="button" class="secondary-button" (click)="load()"><i class="pi pi-refresh" aria-hidden="true"></i> Actualizar</button>
+  </header>
+  <section class="panel filters" aria-label="Filtros del resumen contable">
+    <label>Año<select [(ngModel)]="filterYear" (ngModelChange)="hoveredIndex = null">@for (year of years; track year) { <option [value]="year">{{ year }}</option> }</select></label>
+    <label>Mes<select [(ngModel)]="filterMonth" (ngModelChange)="hoveredIndex = null"><option value="">Todos los meses</option>@for (month of months; track month.value) { <option [value]="month.value">{{ month.label }}</option> }</select></label>
+    <p class="period"><i class="pi pi-calendar" aria-hidden="true"></i> {{ periodLabel }}</p>
+  </section>
+  @if (error) {
+    <p class="error panel" role="alert">{{ error }} Usa «Actualizar» para volver a intentarlo.</p>
+  } @else {
+    @let summary = totals;
+    <section class="summary" aria-label="Totales del periodo">
+      <article class="panel income-card"><div class="card-heading"><span>Ingresos</span><i class="pi pi-arrow-down-left" aria-hidden="true"></i></div><strong>{{ summary.incomeCents / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ summary.paymentCount }} pagos activos · MXN</small></article>
+      <article class="panel expense-card"><div class="card-heading"><span>Egresos</span><i class="pi pi-arrow-up-right" aria-hidden="true"></i></div><strong>{{ summary.expenseCents / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ summary.expenseCount }} gastos registrados · MXN</small></article>
+      <article class="panel balance-card"><div class="card-heading"><span>Diferencia del periodo</span><i class="pi pi-wallet" aria-hidden="true"></i></div><strong [class.negative]="summary.incomeCents < summary.expenseCents">{{ (summary.incomeCents - summary.expenseCents) / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>Ingresos menos egresos · MXN</small></article>
+    </section>
+    <section class="panel chart-panel" aria-labelledby="chart-title">
+      <div class="section-heading"><div><h2 id="chart-title">Ingresos vs. egresos</h2><p>{{ filterMonth ? 'Evolución diaria' : 'Evolución mensual' }} · {{ periodLabel }}</p></div><div class="legend"><span><i class="income-dot"></i>Ingresos</span><span><i class="expense-dot"></i>Egresos</span></div></div>
+      @if (!summary.paymentCount && !summary.expenseCount) { <p class="empty" role="status">No hay ingresos ni egresos registrados en este periodo.</p> }
+      @let chart = chartData;
+      <div class="chart-scroll">
+        <svg viewBox="0 0 960 340" role="img" aria-labelledby="chart-title chart-description">
+          <desc id="chart-description">Importes en pesos mexicanos. Línea continua: ingresos. Línea discontinua: egresos. El resumen mensual se encuentra debajo.</desc>
+          <text x="100" y="22" class="axis-label">MXN</text>
+          @for (tick of chart.ticks; track tick.y) {
+            <line x1="100" x2="920" [attr.y1]="tick.y" [attr.y2]="tick.y" class="grid-line" />
+            <text x="88" [attr.y]="tick.y + 4" text-anchor="end" class="axis-label">{{ axisLabel(tick.amount) }}</text>
+          }
+          <polyline [attr.points]="chart.incomeLine" class="income-line" />
+          <polyline [attr.points]="chart.expenseLine" class="expense-line" />
+          @for (point of chart.points; track point.key; let index = $index) {
+            <text [attr.x]="point.x" y="318" text-anchor="middle" class="axis-label">{{ point.label }}</text>
+            <circle [attr.cx]="point.x" [attr.cy]="point.incomeY" r="4" class="income-point" />
+            <circle [attr.cx]="point.x" [attr.cy]="point.expenseY" r="4" class="expense-point" />
+            <rect [attr.x]="point.x - 12" y="40" width="24" height="260" fill="transparent" tabindex="0" role="button"
+              [attr.aria-label]="point.key + ': ingresos ' + (point.incomeCents / 100 | currency:'MXN':'symbol-narrow') + ', egresos ' + (point.expenseCents / 100 | currency:'MXN':'symbol-narrow')"
+              (mouseenter)="hoveredIndex = index" (focus)="hoveredIndex = index" (click)="hoveredIndex = index" (keydown.enter)="hoveredIndex = index" (keydown.space)="$event.preventDefault(); hoveredIndex = index" />
+          }
+        </svg>
+      </div>
+      <div class="chart-detail" aria-live="polite">
+        @if (hoveredIndex !== null && chart.points[hoveredIndex]; as point) {
+          <strong>{{ point.key }}</strong><span>Ingresos: {{ point.incomeCents / 100 | currency:'MXN':'symbol-narrow' }}</span><span>Egresos: {{ point.expenseCents / 100 | currency:'MXN':'symbol-narrow' }}</span>
+        } @else { <span>Selecciona un punto de la gráfica para consultar sus importes.</span> }
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="monthly-title">
+      <div class="section-heading"><div><h2 id="monthly-title">Resumen por mes</h2><p>{{ periodLabel }}</p></div><nav aria-label="Consultar movimientos"><a routerLink="/pagos">Ver ingresos</a><a routerLink="/gastos">Ver gastos</a></nav></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Mes</th><th scope="col">Ingresos</th><th scope="col">Egresos</th><th scope="col">Diferencia</th><th scope="col">Movimientos</th></tr></thead>
+        <tbody>@for (month of monthlySummaries; track month.key) {
+          <tr><th scope="row">{{ month.label }}</th><td>{{ month.incomeCents / 100 | currency:'MXN':'symbol-narrow' }}</td><td>{{ month.expenseCents / 100 | currency:'MXN':'symbol-narrow' }}</td><td class="balance" [class.negative]="month.incomeCents < month.expenseCents">{{ (month.incomeCents - month.expenseCents) / 100 | currency:'MXN':'symbol-narrow' }}</td><td>{{ month.paymentCount }} pagos · {{ month.expenseCount }} gastos</td></tr>
+        }</tbody>
+        <tfoot><tr><th scope="row">Total del periodo</th><td>{{ summary.incomeCents / 100 | currency:'MXN':'symbol-narrow' }}</td><td>{{ summary.expenseCents / 100 | currency:'MXN':'symbol-narrow' }}</td><td [class.negative]="summary.incomeCents < summary.expenseCents">{{ (summary.incomeCents - summary.expenseCents) / 100 | currency:'MXN':'symbol-narrow' }}</td><td>{{ summary.paymentCount + summary.expenseCount }} movimientos</td></tr></tfoot>
+      </table></div>
+    </section>
+    <p class="data-note">Los ingresos corresponden a pagos activos por fecha de ingreso; los egresos, al total de gastos por fecha del gasto. Los pagos revertidos no se incluyen.</p>
+  }
+</main>

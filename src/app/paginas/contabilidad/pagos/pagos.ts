@@ -53,7 +53,7 @@ export class Pagos implements OnInit {
   editForm = { paymentDate: '' };
   reversalReason = '';
   errorMessage = '';
-  exportFormat: 'pdf' | 'xlsx' = 'pdf';
+  exportFormat: 'pdf' | 'xlsx' | 'png' = 'pdf';
   isExporting = false;
   exportMessage = '';
   readonly monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];

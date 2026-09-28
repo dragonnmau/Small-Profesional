@@ -1,0 +1,45 @@
+<details (toggle)="toggle($event)">
+  <summary><i class="pi pi-paperclip" aria-hidden="true"></i> Evidencias <span>{{ files.length ? files.length + ' archivos' : 'Reporte, fotos y extras' }}</span></summary>
+  <div class="evidence-body">
+    <p class="hint">Se guardan al subirlos, independientemente de los cambios del servicio. Máximo 5 MB por archivo.</p>
+    <div class="evidence-grid">
+      @for (section of sections; track section.kind) {
+        <section [attr.aria-label]="section.label">
+          <div class="section-title"><i [class]="section.icon" aria-hidden="true"></i><h4>{{ section.label }}</h4><span>{{ filesFor(section.kind).length }}</span></div>
+          <button type="button" class="upload-button" (click)="picker.click()" [disabled]="busy"><i class="pi pi-upload" aria-hidden="true"></i> {{ section.kind === 'report' ? (filesFor('report').length ? 'Reemplazar PDF' : 'Subir PDF') : section.kind === 'photos' ? 'Subir imágenes' : 'Subir documentos' }}</button>
+          <input #picker type="file" hidden [accept]="section.accept" [multiple]="section.kind !== 'report'" [disabled]="busy" (change)="upload($event, section.kind)">
+          <small>{{ section.kind === 'report' ? 'Un reporte PDF' : section.kind === 'photos' ? 'JPG, PNG, WebP o GIF' : 'PDF, Office, OpenDocument, TXT, CSV, RTF o XML' }}</small>
+          <div class="file-list">
+            @for (file of filesFor(section.kind); track file.id) {
+              <div class="file"><span [title]="file.name">{{ file.name }}</span><button type="button" title="Previsualizar" [attr.aria-label]="'Previsualizar ' + file.name" (click)="preview(file)"><i class="pi pi-eye" aria-hidden="true"></i></button><button type="button" title="Descargar" [attr.aria-label]="'Descargar ' + file.name" (click)="download(file)"><i class="pi pi-download" aria-hidden="true"></i></button></div>
+            } @empty { <small class="no-files">Sin archivos</small> }
+          </div>
+        </section>
+      }
+    </div>
+    @if (busy) { <p class="status" role="status">Subiendo evidencias…</p> }
+    @if (success) { <p class="status" role="status">{{ success }}</p> }
+    @if (error) { <p class="error" role="alert">{{ error }}</p> }
+  </div>
+</details>
+<dialog #previewDialog class="preview-dialog" aria-labelledby="evidence-preview-title" (cancel)="$event.preventDefault(); closePreview()" (click)="$event.stopPropagation(); $event.target === $event.currentTarget && closePreview()">
+  @if (previewFile; as file) {
+    <header><div><h3 id="evidence-preview-title">Vista previa</h3><p>{{ file.name }}</p></div><button type="button" aria-label="Cerrar vista previa" (click)="closePreview()" autofocus><i class="pi pi-times" aria-hidden="true"></i></button></header>
+    <div class="preview-content">
+      @switch (previewKind) {
+        @case ('image') { <img [src]="previewUrl" [alt]="file.name"> }
+        @case ('pdf') { <iframe [src]="previewPdf" [title]="'Vista previa de ' + file.name"></iframe> }
+        @case ('text') { <pre>{{ previewText }}</pre> }
+        @default { <p class="unsupported">Este formato no tiene vista previa integrada. Descarga el archivo para abrirlo en su aplicación.</p> }
+      }
+    </div>
+    @if (confirmingDelete) {
+      <div class="delete-confirmation" role="group" aria-labelledby="delete-evidence-title">
+        <p id="delete-evidence-title">¿Borrar «{{ file.name }}»? Esta acción no se puede deshacer.</p>
+        @if (deleteError) { <p class="error" role="alert">{{ deleteError }}</p> }
+        <div><button type="button" (click)="confirmingDelete = false; deleteError = ''">Cancelar</button><button type="button" class="danger-button" [disabled]="busy" (click)="deleteEvidence()">Sí, borrar evidencia</button></div>
+      </div>
+    }
+    <footer>@if (!confirmingDelete) { <button type="button" class="danger-button delete-action" [disabled]="busy" (click)="confirmingDelete = true"><i class="pi pi-trash" aria-hidden="true"></i> Borrar evidencia</button> }<button type="button" (click)="download(file)"><i class="pi pi-download" aria-hidden="true"></i> Descargar</button><button type="button" (click)="closePreview()">Cerrar</button></footer>
+  }
+</dialog>

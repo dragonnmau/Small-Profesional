@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ServiceEvidencePanel } from './service-evidence';
 import { Db, DbClient, DbCollaborator, DbLinkedCompany, DbService, NewDbService, ServiceExportOptions } from '../../services/db';
 
 type ServiceStatus = 'Completado' | 'Cancelado en transito' | 'Cancelado' | 'Pendiente';
@@ -9,8 +10,11 @@ interface ServiceForm extends Omit<DbService, 'id' | 'client' | 'company' | 'cli
 interface CalendarDay { date: string; day: number; services: DbService[]; }
 interface ExportCostField { key: string; label: string; }
 
-@Component({ selector: 'app-service-list', imports: [CommonModule, FormsModule], templateUrl: './service-list.html', styleUrl: './service-list.scss' })
+@Component({ selector: 'app-service-list', imports: [CommonModule, FormsModule, ServiceEvidencePanel], templateUrl: './service-list.html', styleUrl: './service-list.scss' })
 export class ServiceList implements OnInit {
+    isPaid(service: DbService): boolean {
+        return ['si', 'sí'].includes(service.servicePaid.trim().toLocaleLowerCase('es-MX')) || service.status.trim().toLocaleLowerCase('es-MX') === 'pagado';
+    }
     services: DbService[] = [];
     clients: DbClient[] = [];
     linkedCompanies: DbLinkedCompany[] = [];
@@ -20,6 +24,7 @@ export class ServiceList implements OnInit {
     selectedMonth = this.currentDate().slice(0, 7);
     isFormOpen = false;
     editingServiceId: number | null = null;
+    uploadingEvidence = false;
     search = '';
     selectedClientId: number | null = null;
     selectedCompanyId: number | null = null;
@@ -76,11 +81,13 @@ export class ServiceList implements OnInit {
         return cells;
     }
 
+    get today(): string { return this.currentDate(); }
+
     trackCalendarDay(index: number, cell: CalendarDay | null): string | number { return cell?.date ?? index; }
 
     openForm(date?: string): void { this.editingServiceId = null; this.serviceForm = this.emptyForm(); if (date) this.serviceForm.date = date; this.isFormOpen = true; }
     openEditForm(service: DbService): void { this.editingServiceId = service.id; this.serviceForm = { ...service, materials: service.materials.map(material => ({ ...material })) }; this.isFormOpen = true; }
-    closeForm(): void { this.isFormOpen = false; }
+    closeForm(): void { if (!this.uploadingEvidence) this.isFormOpen = false; }
     openExport(): void {
         this.exportMonth = this.selectedMonth || 'all'; this.exportClientId = null; this.exportCompanyId = null;
         this.exportFields = Object.fromEntries(this.exportCostFields.map(field => [field.key, true])); this.isExportOpen = true;
@@ -107,9 +114,10 @@ export class ServiceList implements OnInit {
     }
 
     saveService(): void {
-        if (this.serviceForm.clientId === null) return;
+        if (this.serviceForm.clientId === null || this.uploadingEvidence) return;
         this.updateMaterialsCost();
         const values: NewDbService = {
+            ...(this.editingServiceId !== null ? { internalComment: (this.serviceForm.internalComment ?? '').trim() } : {}),
             date: this.serviceForm.date, time: this.serviceForm.time, clientId: this.serviceForm.clientId, companyId: this.serviceForm.companyId,
             city: this.serviceForm.city.trim(), site: this.serviceForm.site.trim(), description: this.serviceForm.description.trim(), folio: this.serviceForm.folio.trim(), status: this.serviceForm.status, servicePaid: this.serviceForm.servicePaid,
             serviceCost: Number(this.serviceForm.serviceCost) || 0, travelAllowance: Number(this.serviceForm.travelAllowance) || 0, travelDeposit: this.serviceForm.travelDeposit,

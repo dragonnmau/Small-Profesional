@@ -1,0 +1,35 @@
+<details (toggle)="toggle($event)">
+  <summary><i class="pi pi-file-pdf" aria-hidden="true"></i> Comprobantes del mes <span>{{ files.length }}/2</span></summary>
+  <div class="documents-body">
+    <p class="hint">Un PDF por comprobante · Máximo 5 MB. Se guardan al subirlos, por separado de los importes.</p>
+    <div class="documents-grid">
+      @for (section of sections; track section.kind) {
+        <section [attr.aria-label]="section.label">
+          <h4>{{ section.label }}</h4>
+          @let file = fileFor(section.kind);
+          <div class="document-row"><span [title]="file?.name || ''">{{ file?.name || 'Sin comprobante' }}</span>
+            <button type="button" (click)="picker.click()" [disabled]="busy" [attr.aria-label]="(file ? 'Reemplazar ' : 'Subir ') + section.label"><i class="pi pi-upload" aria-hidden="true"></i> {{ file ? 'Reemplazar' : 'Subir PDF' }}</button>
+            @if (file) { <button type="button" title="Previsualizar comprobante" [attr.aria-label]="'Previsualizar ' + file.name" (click)="preview(file)"><i class="pi pi-eye" aria-hidden="true"></i></button> }
+            <input #picker type="file" accept=".pdf" hidden [disabled]="busy" (change)="upload($event, section.kind)">
+          </div>
+        </section>
+      }
+    </div>
+    @if (busy) { <p class="status" role="status">Subiendo comprobante…</p> }
+    @if (success) { <p class="status" role="status">{{ success }}</p> }
+    @if (error) { <p class="error" role="alert">{{ error }}</p> }
+  </div>
+</details>
+<dialog #viewer class="viewer" aria-labelledby="fiscal-document-title" (keydown.escape)="$event.stopPropagation()" (cancel)="$event.preventDefault(); closePreview()" (click)="$event.stopPropagation(); $event.target === $event.currentTarget && closePreview()">
+  @if (previewFile; as file) {
+    <header><div><h3 id="fiscal-document-title">{{ file.kind === 'declaration' ? 'Comprobante de declaración' : 'Comprobante de pago' }} · {{ month }}/{{ year }}</h3><p>{{ file.name }}</p></div><button type="button" (click)="closePreview()" aria-label="Cerrar previsualización" autofocus>×</button></header>
+    <iframe [src]="pdfUrl" [title]="'Vista previa de ' + file.name"></iframe>
+    @if (confirmingDelete) {
+      <div class="delete-confirmation" role="group" aria-labelledby="fiscal-document-delete"><p id="fiscal-document-delete">¿Borrar «{{ file.name }}»? Esta acción no se puede deshacer.</p>
+        @if (viewerError) { <p class="error" role="alert">{{ viewerError }}</p> }
+        <div><button type="button" (click)="confirmingDelete = false; viewerError = ''">Cancelar</button><button type="button" class="danger" (click)="remove()">Sí, borrar comprobante</button></div>
+      </div>
+    }
+    <footer>@if (!confirmingDelete) { <button type="button" class="danger delete-action" (click)="confirmingDelete = true">Borrar comprobante</button> }<a [href]="previewUrl" [download]="file.name">Descargar PDF</a><button type="button" (click)="closePreview()">Cerrar</button></footer>
+  }
+</dialog>

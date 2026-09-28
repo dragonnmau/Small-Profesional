@@ -14,6 +14,10 @@ import { Pagos } from './paginas/contabilidad/pagos/pagos';
 import { Facturas } from './paginas/contabilidad/facturas/facturas';
 import { Colaboradores } from './paginas/miEmpresa/colaboradores/colaboradores';
 import { Gastos } from './paginas/contabilidad/gastos/gastos';
+import { DashboardConta } from './paginas/contabilidad/dashboard-conta/dashboard-conta';
+import { AnoFiscal } from './paginas/contabilidad/ano-fiscal/ano-fiscal';
+import { Productos } from './paginas/ventas/productos/productos';
+import { Cotizador } from './paginas/ventas/cotizador/cotizador';
 
 export const routes: Routes = [
     //Dashboard
@@ -51,11 +55,12 @@ export const routes: Routes = [
         component: Kanban,
     },
     //Contabilidad
+    { path: 'ano-fiscal', component: AnoFiscal },
     { path: 'facturas', component: Facturas },
         //pagos
     {
-        path: 'contabilidad',
-        component: Dashboard,
+        path: 'DashboardConta',
+        component: DashboardConta,
     },
     {
         path: 'bankAccounts',
@@ -73,6 +78,20 @@ export const routes: Routes = [
         path: 'CalculadoraImpuestos',
         component: CalculoImpuestos,
     },
+
+    /// ventas 
+
+    {
+        path: 'productosyServicios',
+        component: Productos,
+    },
+    //inventarios
+    //cotizador 
+    {
+        path: 'cotizador',
+        component: Cotizador,
+    },
+    //PoS
 
     // Mi empresa
         //Proveedores
