@@ -30,12 +30,23 @@
   <section class="panel"><h2>Historial de gastos</h2><div class="table-wrap"><table>
     <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Cuenta</th><th>Mes de facturación</th><th>Subtotal</th><th>IVA</th><th>Total MXN</th><th>Factura</th><th>Archivos</th><th>Acciones</th></tr></thead>
     <tbody>@for (expense of filteredExpenses; track expense.id) {
-      <tr><td>{{ expense.expenseDate }}<small>#{{ expense.id }}</small></td><td class="concept">{{ expense.concept }}</td><td>{{ expense.category || "Sin categoría" }}</td><td>{{ expense.accountName }}<small>{{ expense.bank }}</small>@if (expense.cardId) { <small>{{ expense.cardType }} **** {{ expense.cardLastFour }}</small> }</td><td>{{ billingMonthLabel(expense.billingMonth) }}</td><td>{{ expense.subtotal | currency:'MXN':'symbol-narrow' }}</td><td>{{ expense.iva | currency:'MXN':'symbol-narrow' }}<small>{{ expense.ivaMode === 'none' ? 'Sin IVA' : expense.ivaRate + '%' }}</small></td><td><strong>{{ expense.total | currency:'MXN':'symbol-narrow' }}</strong></td><td>{{ expense.hasInvoice ? 'Con factura' : 'Sin factura' }}@if (expense.hasInvoice) { <small class="cfdi-label">{{ cfdiLabel(expense.cfdiUse) }}</small> }</td><td>
-      <div class="attachments">@if (expense.ticketName) { <button class="secondary-button" (click)="download(expense, 'ticket')" [attr.aria-label]="'Descargar ticket de gasto ' + expense.id">Ticket ↓</button> } @if (expense.invoiceName) { <button class="secondary-button" (click)="download(expense, 'invoice')" [attr.aria-label]="'Descargar factura de gasto ' + expense.id">Factura ↓</button> } @if (!expense.ticketName && !expense.invoiceName) { <small>Sin archivos</small> }</div>
+      <tr><td>{{ expense.expenseDate }}<small>#{{ expense.id }}</small></td><td class="concept">{{ expense.concept }}</td><td>{{ expense.category || "Sin categoría" }}</td><td>{{ expense.accountName }}<small>{{ expense.bank }}</small>@if (expense.cardId) { <small>{{ expense.cardType }} **** {{ expense.cardLastFour }}</small> }</td><td>{{ billingMonthLabel(expense.billingMonth) }}</td><td>{{ expense.subtotal | currency:'MXN':'symbol-narrow' }}</td><td>{{ expense.iva | currency:'MXN':'symbol-narrow' }}<small>{{ expense.ivaMode === 'none' ? 'Sin IVA' : expense.ivaMode === 'custom' ? 'IVA personalizado' : expense.ivaRate + '%' }}</small></td><td><strong>{{ expense.total | currency:'MXN':'symbol-narrow' }}</strong></td><td>{{ expense.hasInvoice ? 'Con factura' : 'Sin factura' }}@if (expense.hasInvoice) { <small class="cfdi-label">{{ cfdiLabel(expense.cfdiUse) }}</small> }</td><td>
+      <div class="attachments">@if (expense.ticketName) { <button type="button" class="file-action" (click)="download(expense, 'ticket')" [attr.aria-label]="'Descargar ticket de gasto ' + expense.id"><i class="pi pi-download" aria-hidden="true"></i><span>Descargar ticket</span></button> } @if (expense.invoiceName) { <button type="button" class="file-action" title="Ver Factura" (click)="previewInvoice(expense)" [attr.aria-label]="'Ver factura de gasto ' + expense.id"><i class="pi pi-eye" aria-hidden="true"></i></button><button type="button" class="file-action" title="Descargar Factura" (click)="download(expense, 'invoice')" [attr.aria-label]="'Descargar factura de gasto ' + expense.id"><i class="pi pi-download" aria-hidden="true"></i></button> } @if (!expense.ticketName && !expense.invoiceName) { <small>Sin archivos</small> }</div>
       </td><td><button type="button" class="secondary-button" (click)="openEdit(expense)" [attr.aria-label]="'Editar gasto ' + expense.id"><i class="pi pi-pencil" aria-hidden="true"></i> Editar</button></td></tr>
     } @empty { <tr><td colspan="11" class="empty">{{ expenses.length ? 'No hay gastos con estos filtros.' : 'Aún no hay gastos. Registra el primero para comenzar.' }}</td></tr> }</tbody>
   </table></div></section>
 </main>
+@if (previewFile; as file) {
+  <div class="preview-backdrop" (click)="closeInvoicePreview()">
+    <section class="preview-modal" role="dialog" aria-modal="true" aria-labelledby="invoice-preview-title" (click)="$event.stopPropagation()" (keydown.escape)="closeInvoicePreview()">
+      <header><div><h2 id="invoice-preview-title">Factura del gasto #{{ file.id }}</h2><p>{{ file.invoiceName }}</p></div><button type="button" class="file-action" aria-label="Cerrar vista previa" (click)="closeInvoicePreview()"><i class="pi pi-times" aria-hidden="true"></i><span>Cerrar</span></button></header>
+      @if (previewKind === 'pdf') { <iframe [src]="previewPdf" [title]="'Vista previa de ' + file.invoiceName"></iframe> }
+      @else if (previewKind === 'image') { <img [src]="previewUrl" [alt]="file.invoiceName || 'Factura'"> }
+      @else { <p class="preview-notice">Este formato no se puede previsualizar aquí. Descarga el archivo para abrirlo.</p> }
+      <footer><button type="button" class="file-action" (click)="download(file, 'invoice')"><i class="pi pi-download" aria-hidden="true"></i><span>Descargar factura</span></button></footer>
+    </section>
+  </div>
+}
 @if (isModalOpen) {
   <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="expense-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="closeModal()">
     <header><div><h2 id="expense-title">{{ editingExpense ? 'Editar gasto #' + editingExpense.id : 'Registrar gasto' }}</h2><p>{{ editingExpense ? 'Al guardar se ajustarán los saldos si cambia el importe, la cuenta o la tarjeta.' : 'El total se descontará de la cuenta seleccionada.' }}</p></div><button class="secondary-button" aria-label="Cerrar" [disabled]="saving || readingFiles > 0" (click)="closeModal()">×</button></header>
@@ -55,8 +66,11 @@
       }
       <div class="form-grid">
         <label>{{ form.ivaMode === 'included' ? 'Importe total (MXN)' : 'Importe sin IVA (MXN)' }}<input type="number" name="amount" [(ngModel)]="form.amount" min="0.01" max="999999999.99" step="0.01" required></label>
-        <label>IVA<select name="iva" [(ngModel)]="form.ivaMode"><option value="none">Sin IVA</option><option value="added">Más IVA ({{ ivaRate }}%)</option><option value="included">IVA incluido ({{ ivaRate }}%)</option></select></label>
+        <label>IVA<select name="iva" [(ngModel)]="form.ivaMode"><option value="none">Sin IVA</option><option value="added">Más IVA ({{ ivaRate }}%)</option><option value="included">IVA incluido ({{ ivaRate }}%)</option><option value="custom">IVA personalizado</option></select></label>
       </div>
+      @if (form.ivaMode === 'custom') {
+        <label>IVA del ticket (MXN)<input type="number" name="customIva" [(ngModel)]="form.customIva" min="0" max="999999999.99" step="0.01" required placeholder="0.00"><small>Captura el IVA en pesos. Se suma al importe sin IVA.</small></label>
+      }
       <label class="checkbox"><input type="checkbox" name="hasInvoice" [(ngModel)]="form.hasInvoice" (ngModelChange)="invoiceChanged()">Tiene factura (opcional)</label>
       @if (form.hasInvoice) {
         <label>Uso de CFDI (México)<select name="cfdiUse" [(ngModel)]="form.cfdiUse" required><option value="" disabled>Selecciona el uso de CFDI</option>@for (use of cfdiUses; track use.code) { <option [value]="use.code">{{ use.code }} · {{ use.label }}</option> }</select><small>Selecciona el uso que aparece en tu factura.</small></label>

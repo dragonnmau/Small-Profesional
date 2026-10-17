@@ -1,0 +1,57 @@
+<div class="cost-dashboard">
+  <header class="page-header"><div><span class="eyebrow">Servicios · Análisis de costos</span><h1>Desglose de servicios</h1><p>Consulta cómo se distribuyen los costos de cada mes y del año completo.</p></div><a class="button" routerLink="/servicios/serviceList"><i class="pi pi-list"></i> Lista de servicios</a></header>
+
+  <section class="panel filters" aria-label="Período del desglose"><label>Año del resumen<select [(ngModel)]="selectedYear" (ngModelChange)="updateYear()">@for (year of years; track year) { <option [ngValue]="year">{{ year }}</option> }</select></label><p><i class="pi pi-calendar"></i> Enero — diciembre de {{ selectedYear }} · Importes en MXN</p><button type="button" (click)="refresh()"><i class="pi pi-refresh"></i> Actualizar</button></section>
+  @if (error) { <p class="error" role="alert">{{ error }}</p> }
+
+  <section class="summary" aria-label="Resumen anual">
+    <article class="panel total-card"><span>Costo total del año<i class="pi pi-wallet"></i></span><strong>{{ annualTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong><small>{{ annualCount }} servicios registrados</small></article>
+    <article class="panel"><span>Promedio mensual<i class="pi pi-calendar"></i></span><strong>{{ monthlyAverage | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong><small>Calculado sobre los 12 meses</small></article>
+    <article class="panel"><span>Categoría de mayor costo<i class="pi pi-chart-bar"></i></span><strong class="category-name">{{ annualTotal ? ranking[0].label : 'Sin costos' }}</strong><small>{{ ranking[0].amount | currency:'MXN':'symbol-narrow':'1.2-2' }} · {{ percentage(ranking[0].amount, annualTotal) | number:'1.0-1' }}% del total</small></article>
+  </section>
+
+  @if (!annualCount && !error) { <p class="empty" role="status"><i class="pi pi-info-circle"></i> No hay servicios registrados en {{ selectedYear }}. Selecciona otro año o registra servicios desde la lista.</p> }
+  @if (annualCount && !annualTotal) { <p class="empty" role="status">Los servicios de este año aún no tienen costos registrados.</p> }
+
+  <section class="panel monthly-panel">
+    <div class="section-heading"><div><span class="eyebrow">Evolución mensual</span><h2>Costos por mes</h2><p>Selecciona una barra para consultar el detalle del mes.</p></div><span class="scale">Escala máxima: {{ maxMonthTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</span></div>
+    <div class="legend">@for (category of categories; track category.key) { <span><i [style.background]="category.color"></i>{{ category.label }}</span> }</div>
+    <div class="chart-scroll">
+      <div class="monthly-chart" role="group" aria-label="Gráfico de barras apiladas de costos mensuales">
+        @for (month of months; track month.month) {
+          <button type="button" class="month-bar" [class.active]="selectedMonth === month.month" [attr.aria-pressed]="selectedMonth === month.month" [attr.aria-label]="month.label + ': ' + (month.total | currency:'MXN':'symbol-narrow') + ', ' + month.count + ' servicios. Ver desglose.'" (click)="selectedMonth = month.month">
+            <span class="bar-value">{{ month.total | number:'1.0-0' }}</span>
+            <span class="bar-track" aria-hidden="true"><span class="stack" [style.height.%]="percentage(month.total, maxMonthTotal)">
+              @for (category of categories; track category.key) { <span class="segment" [style.height.%]="percentage(month.costs[category.key], month.total)" [style.background]="category.color" [title]="category.label + ': ' + (month.costs[category.key] | currency:'MXN':'symbol-narrow')"></span> }
+            </span></span>
+            <span class="month-label">{{ month.shortLabel }}</span>
+          </button>
+        }
+      </div>
+    </div>
+    @if (activeMonth; as month) {
+      <div class="month-detail" aria-live="polite"><div class="detail-heading"><h3>{{ month.label }} {{ selectedYear }}</h3><span>{{ month.count }} servicios · {{ month.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</span></div>
+        <div class="month-categories">@for (category of categories; track category.key) { <div><span><i [style.background]="category.color"></i>{{ category.label }}</span><strong>{{ month.costs[category.key] | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong><small>{{ percentage(month.costs[category.key], month.total) | number:'1.0-1' }}% del mes</small></div> }</div>
+      </div>
+    }
+  </section>
+
+  <section class="panel ranking-panel">
+    <div class="section-heading"><div><span class="eyebrow">Comparación anual</span><h2>Costos generales de mayor a menor</h2><p>Total acumulado por categoría en {{ selectedYear }}.</p></div></div>
+    <ol class="ranking" aria-label="Gráfico de barras de categorías ordenadas por costo">
+      @for (category of ranking; track category.key) {
+        <li><div class="ranking-heading"><span><i [style.background]="category.color"></i>{{ category.label }}</span><strong>{{ category.amount | currency:'MXN':'symbol-narrow':'1.2-2' }} <small>({{ percentage(category.amount, annualTotal) | number:'1.0-1' }}%)</small></strong></div>
+          <div class="ranking-track" aria-hidden="true"><span [style.width.%]="percentage(category.amount, maxCategoryTotal)" [style.background]="category.color"></span></div>
+        </li>
+      }
+    </ol>
+  </section>
+
+  <section class="panel table-panel"><div class="section-heading"><div><h2>Desglose mensual de costos</h2><p>Todos los importes incluyen las categorías registradas en cada servicio.</p></div></div>
+    <div class="table-scroll"><table><caption class="sr-only">Costos de servicios por mes en {{ selectedYear }}, en pesos mexicanos</caption><thead><tr><th scope="col">Mes</th><th scope="col">Servicios</th>@for (category of categories; track category.key) { <th scope="col">{{ category.label }}</th> }<th scope="col">Total MXN</th></tr></thead>
+      <tbody>@for (month of months; track month.month) { <tr [class.selected-row]="selectedMonth === month.month"><th scope="row"><button type="button" class="month-link" (click)="selectedMonth = month.month" [attr.aria-label]="'Ver gráfico de ' + month.label">{{ month.label }}</button></th><td>{{ month.count }}</td>@for (category of categories; track category.key) { <td>{{ month.costs[category.key] | currency:'MXN':'symbol-narrow':'1.2-2' }}</td> }<td class="row-total">{{ month.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td></tr> }</tbody>
+      <tfoot><tr><th scope="row">Total anual</th><td>{{ annualCount }}</td>@for (category of categories; track category.key) { <td>{{ rankingAmount(category.key) | currency:'MXN':'symbol-narrow':'1.2-2' }}</td> }<td>{{ annualTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</td></tr></tfoot>
+    </table></div>
+  </section>
+  <p class="data-note">Los costos se agrupan por la fecha del servicio, independientemente de su estado o pago. Incluye servicios cancelados y cancelados en tránsito. El total suma servicio, viáticos, materiales, transporte y gasolina; no representa pagos recibidos.</p>
+</div>

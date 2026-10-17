@@ -108,6 +108,42 @@ describe('Gastos', () => {
     expect(component.totals).toEqual({ subtotal: 100, iva: 16, total: 116 });
   });
 
+  it('muestra el importe personalizado y lo usa solo al seleccionar esa modalidad', () => {
+    component.openModal(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('input[name="customIva"]')).toBeNull();
+    component.form.amount = 100;
+    component.form.ivaMode = 'custom'; component.form.customIva = 12.35;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('input[name="customIva"]')).toBeTruthy();
+    expect(component.totals).toEqual({ subtotal: 100, iva: 12.35, total: 112.35 });
+    component.form.ivaMode = 'added';
+    expect(component.totals.total).toBe(116);
+  });
+
+  it('recupera y guarda el IVA personalizado al editar un gasto', () => {
+    const expense = { id: 9, accountId: 1, expenseDate: '2026-09-01', billingMonth: '09',
+      concept: 'Compra', category: 'Materiales', cfdiUse: '', ivaMode: 'custom', ivaRate: 0,
+      subtotal: 100, iva: 12.35, total: 112.35, hasInvoice: false } as DbExpense;
+    const update = spyOn(TestBed.inject(Db), 'updateExpense').and.returnValue(expense);
+    component.openEdit(expense);
+    expect(component.form.customIva).toBe(12.35);
+    expect(component.ivaRate).toBe(16);
+    expect(component.totals.total).toBe(112.35);
+    component.save();
+    expect(update).toHaveBeenCalledWith(9, jasmine.objectContaining({ ivaMode: 'custom', customIva: 12.35 }));
+  });
+
+  it('rechaza IVA personalizado vacío, negativo o con más de dos decimales', () => {
+    const create = spyOn(TestBed.inject(Db), 'createExpense');
+    component.openModal();
+    Object.assign(component.form, { accountId: 1, concept: 'Compra', category: 'Materiales', amount: 100, ivaMode: 'custom' });
+    for (const value of [null, -1, 1.001, NaN, Infinity]) {
+      component.form.customIva = value; component.save();
+      expect(component.error).toContain('IVA en pesos');
+    }
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('conserva el formulario cuando falla el guardado', () => {
     component.openModal();
     component.form.accountId = 1;

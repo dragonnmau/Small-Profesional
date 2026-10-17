@@ -1,0 +1,25 @@
+<main class="hockey-page">
+  <header class="page-heading"><span class="eyebrow">Toolbox · Juegos</span><h1>Air Hockey</h1><p>Una pausa rápida. Tú contra la máquina.</p></header>
+  <section class="game-shell" aria-label="Partida de Air Hockey">
+    <div class="scoreboard" aria-label="Marcador">
+      <div class="score player-score"><span><i class="pi pi-user" aria-hidden="true"></i> Tú</span><strong>{{ game.playerScore }}</strong><div class="score-dots" aria-hidden="true">@for (point of [1,2,3]; track point) { <i [class.filled]="game.playerScore >= point"></i> }</div></div>
+      <div class="match-label"><span>MEJOR DE 5</span><strong>1 vs. CPU</strong><small>El primero en llegar a 3 gana</small></div>
+      <div class="score machine-score"><span><i class="pi pi-desktop" aria-hidden="true"></i> Máquina</span><strong>{{ game.machineScore }}</strong><div class="score-dots" aria-hidden="true">@for (point of [1,2,3]; track point) { <i [class.filled]="game.machineScore >= point"></i> }</div></div>
+    </div>
+    <div class="rink-area">
+      <div class="rink-frame">
+        <canvas #rink width="480" height="640" (pointermove)="movePointer($event)" (pointerdown)="movePointer($event)" aria-label="Mesa de Air Hockey. Mueve el mouse en la mitad inferior para golpear el disco hacia la portería superior.">Tu navegador necesita soporte de canvas para jugar.</canvas>
+        @if (game.state !== 'playing') {
+          <div class="game-overlay"><div>
+            @if (game.state === 'ready') { <i class="pi pi-bolt overlay-icon" aria-hidden="true"></i><h2>¿Listo para jugar?</h2><p>Tu paleta es azul.<br>Mueve el mouse y marca arriba.</p><button type="button" class="primary" (click)="start()">Iniciar partida <i class="pi pi-arrow-right" aria-hidden="true"></i></button> }
+            @else if (game.state === 'paused') { <i class="pi pi-pause overlay-icon" aria-hidden="true"></i><h2>Partida en pausa</h2><p>Retoma la partida cuando estés listo.</p><button type="button" class="primary" (click)="togglePause()">Continuar</button> }
+            @else { <i class="pi pi-trophy overlay-icon" aria-hidden="true"></i><h2>{{ game.playerScore === 3 ? '¡Victoria!' : 'Buen intento' }}</h2><p>{{ game.message }}<br>Marcador final: {{ game.playerScore }} — {{ game.machineScore }}</p><button type="button" class="primary" (click)="start()">Volver a jugar</button> }
+          </div></div>
+        } @else if (game.serveRemaining > 0) { <div class="serve-message" aria-hidden="true">Preparando saque…</div> }
+      </div>
+    </div>
+    <p class="game-status" role="status" aria-live="polite">{{ game.state === 'paused' ? 'Partida en pausa.' : game.message }} <span class="sr-only">Marcador: tú {{ game.playerScore }}, máquina {{ game.machineScore }}.</span></p>
+    <div class="game-actions"><button type="button" (click)="togglePause()" [disabled]="game.state === 'ready' || game.state === 'finished'"><i [class]="game.state === 'paused' ? 'pi pi-play' : 'pi pi-pause'" aria-hidden="true"></i> {{ game.state === 'paused' ? 'Continuar' : 'Pausar' }}</button><button type="button" (click)="start()"><i class="pi pi-refresh" aria-hidden="true"></i> Nueva partida</button></div>
+  </section>
+  <footer class="instructions"><span><i class="pi pi-arrows-alt" aria-hidden="true"></i> Control con mouse</span><span><i class="pi pi-circle" aria-hidden="true"></i> Juega en la mitad inferior</span><span><i class="pi pi-flag" aria-hidden="true"></i> 3 puntos para ganar</span></footer>
+</main>

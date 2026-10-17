@@ -1,0 +1,42 @@
+<main class="solitaire-page">
+  <header class="page-header"><div><span class="eyebrow">Toolbox · Juegos</span><h1>Solitario</h1><p>Ordena las cartas, gana Cash y vuelve a la chamba.</p></div><div class="cash-balance" aria-label="Saldo de Cash"><i class="pi pi-wallet" aria-hidden="true"></i><div><small>Tu Cash</small><strong>{{ cash }}</strong></div></div></header>
+  <div class="game-toolbar"><div class="stakes"><span>Partida <strong>−5 Cash</strong></span><span>Victoria <strong>+25 Cash</strong></span></div><div class="game-actions"><button type="button" (click)="undo()" [disabled]="!game?.canUndo || !!storageError"><i class="pi pi-undo" aria-hidden="true"></i> Deshacer</button><button type="button" class="primary" (click)="requestNewGame()" [disabled]="cash < entryCost || !!storageError">Nueva partida · 5 Cash</button></div></div>
+  @if (storageError) { <div class="storage-error" role="alert">{{ storageError }} <button type="button" (click)="retryStorage()">Reintentar</button></div> }
+  @if (cash < entryCost && game?.state !== 'playing') { <p class="notice">Necesitas al menos 5 Cash para iniciar otra partida.</p> }
+  @if (confirmNewGame) { <div class="new-game-confirm" role="group" aria-label="Confirmar nueva partida"><p>La partida actual se reemplazará y se descontarán 5 Cash.</p><button type="button" class="primary" (click)="startGame()">Iniciar nueva · 5 Cash</button><button type="button" (click)="confirmNewGame = false">Seguir jugando</button></div> }
+  @if (game; as match) {
+    @if (match.state === 'won') { <section class="win-screen" role="status" aria-labelledby="win-title"><i class="pi pi-trophy" aria-hidden="true"></i><span>¡Partida ganada! · +25 Cash</span><h2 id="win-title">Ya Ponte a Chambear!!</h2><p>Tu saldo: {{ cash }} Cash</p><button type="button" (click)="requestNewGame()" [disabled]="!!storageError || cash < entryCost">Otra partida · 5 Cash</button></section> }
+    @else {
+    <section class="table-scroll" aria-label="Mesa de solitario">
+      <div class="card-table">
+        <div class="top-piles">
+          <div class="pile-group"><span class="pile-label">Mazo · {{ match.stock.length }}</span><button type="button" class="card stock-card" [class.card-back]="match.stock.length > 0" (click)="draw()" [disabled]="match.state !== 'playing' || !!storageError || (!match.stock.length && !match.waste.length)" [attr.aria-label]="match.stock.length ? 'Robar una carta del mazo' : 'Volver a pasar las cartas del descarte'">@if (!match.stock.length) { <i class="pi pi-refresh" aria-hidden="true"></i> }</button></div>
+          <div class="pile-group"><span class="pile-label">Descarte</span>@if (match.waste.at(-1); as card) { <button type="button" class="card face-card" [class.red]="red(card)" [class.selected-card]="isSelected({pile:'waste',index:0,cardIndex:match.waste.length - 1})" [draggable]="match.state === 'playing'" (dragstart)="dragStart($event, {pile:'waste',index:0,cardIndex:match.waste.length - 1})" (click)="select({pile:'waste',index:0,cardIndex:match.waste.length - 1})" (dblclick)="autoMove({pile:'waste',index:0,cardIndex:match.waste.length - 1})" [attr.aria-label]="cardName(card)"><span class="card-corner">{{ label(card) }}<span>{{ symbol(card.suit) }}</span></span><span class="card-symbol">{{ symbol(card.suit) }}</span><span class="card-corner bottom">{{ label(card) }}<span>{{ symbol(card.suit) }}</span></span></button> } @else { <div class="card empty-slot" aria-label="Descarte vacío"></div> }</div>
+          <div class="pile-spacer"></div>
+          @for (suit of suits; track suit; let index = $index) {
+            <div class="pile-group" (dragover)="$event.preventDefault()" (drop)="drop($event, 'foundation', index)"><span class="pile-label">Base {{ symbol(suit) }}</span>
+              @if (match.foundations[index].at(-1); as card) { <button type="button" class="card face-card" [class.red]="red(card)" [class.selected-card]="isSelected({pile:'foundation',index:index,cardIndex:match.foundations[index].length - 1})" [draggable]="match.state === 'playing'" (dragstart)="dragStart($event, {pile:'foundation',index:index,cardIndex:match.foundations[index].length - 1})" (click)="selected ? moveTo('foundation', index) : select({pile:'foundation',index:index,cardIndex:match.foundations[index].length - 1})" [attr.aria-label]="'Base: ' + cardName(card) + '. Seleccionar o colocar carta.'"><span class="card-corner">{{ label(card) }}<span>{{ symbol(suit) }}</span></span><span class="card-symbol">{{ symbol(suit) }}</span><span class="card-corner bottom">{{ label(card) }}<span>{{ symbol(suit) }}</span></span></button> }
+              @else { <button type="button" class="card empty-slot foundation-slot" (click)="moveTo('foundation', index)" [attr.aria-label]="'Colocar As en la base ' + symbol(suit)">{{ symbol(suit) }}</button> }
+            </div>
+          }
+        </div>
+        <div class="tableau">
+          @for (column of match.tableau; track $index; let columnIndex = $index) {
+            <div class="column" [style.min-height.px]="columnHeight(column.length)" (dragover)="$event.preventDefault()" (drop)="drop($event, 'tableau', columnIndex)">
+              <button type="button" class="card empty-slot column-slot" (click)="moveTo('tableau', columnIndex)" [attr.aria-label]="'Colocar cartas en columna ' + (columnIndex + 1)">K</button>
+              @for (card of column; track card.suit + card.rank; let cardIndex = $index) {
+                <button type="button" class="card tableau-card" [class.face-card]="card.faceUp" [class.card-back]="!card.faceUp" [class.red]="card.faceUp && red(card)" [class.selected-card]="isSelected({pile:'tableau',index:columnIndex,cardIndex:cardIndex})" [style.top.px]="cardIndex * 30" [disabled]="!card.faceUp" [draggable]="card.faceUp && match.state === 'playing'" (dragstart)="dragStart($event, {pile:'tableau',index:columnIndex,cardIndex:cardIndex})" (click)="clickCard({pile:'tableau',index:columnIndex,cardIndex:cardIndex})" (dblclick)="autoMove({pile:'tableau',index:columnIndex,cardIndex:cardIndex})" [attr.aria-label]="cardName(card) + ', columna ' + (columnIndex + 1)">
+                  @if (card.faceUp) { <span class="card-corner">{{ label(card) }}<span>{{ symbol(card.suit) }}</span></span><span class="card-symbol">{{ symbol(card.suit) }}</span><span class="card-corner bottom">{{ label(card) }}<span>{{ symbol(card.suit) }}</span></span> }
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+    <div class="match-info"><span>{{ match.moves }} movimientos · Partida guardada automáticamente</span>@if (match.canFinish) { <button type="button" (click)="finish()" [disabled]="!!storageError">Completar bases</button> }</div>
+    }
+  } @else { <section class="start-screen"><div class="welcome-cards" aria-hidden="true">A♠ <span>A♥</span></div><h2>Una mano antes de seguir</h2><p>Empieza con 100 Cash. Cada partida cuesta 5 y ganar te da 25.</p><button type="button" class="primary" (click)="requestNewGame()" [disabled]="cash < entryCost || !!storageError">Jugar · 5 Cash</button></section> }
+  <p class="game-notice" role="status" aria-live="polite">{{ notice }}</p>
+  <footer class="rules"><h2>Cómo jugar</h2><p>Arrastra las cartas o selecciona una carta y después su destino. En las columnas, baja del Rey al As alternando rojo y negro. Solo un Rey puede ocupar una columna vacía. En las bases, sube del As al Rey por palo. Haz doble clic en una carta para llevarla a su base cuando sea válido.</p><p>Roba una carta por vez; puedes volver a pasar el descarte. Se descubren automáticamente las cartas libres. El saldo y la partida se guardan en este dispositivo. Retomar una partida no cuesta Cash.</p></footer>
+</main>

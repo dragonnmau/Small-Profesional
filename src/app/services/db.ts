@@ -3,6 +3,7 @@ import expenseCatalogs from './expense-catalogs.json';
 
 export interface DbCatalogCategory { id: number; name: string; }
 export interface NewDbCatalogItem {
+  satCode?: string;
   kind: 'Producto' | 'Servicio' | 'Paquete'; name: string; description: string;
   categoryId: number | null; sku: string; price: number; quantity: number; unit: string;
   products: { productId: number; quantity: number }[];
@@ -140,6 +141,8 @@ export interface DbServiceMaterial {
   cost: number;
 }
 
+export type ServiceReportType = 'informative' | 'acknowledgement' | 'log';
+
 export interface DbService {
   id: number;
   date: string;
@@ -176,7 +179,7 @@ export interface NewDbExpense {
   cardId?: number | null;
   category: string; cfdiUse: string; billingMonth: string;
   accountId: number; expenseDate: string; concept: string; amount: number;
-  ivaMode: 'none' | 'added' | 'included'; hasInvoice: boolean;
+  ivaMode: 'none' | 'added' | 'included' | 'custom'; customIva?: number | null; hasInvoice: boolean;
   ticket: ExpenseAttachment | null; invoice: ExpenseAttachment | null; createdBy: string;
 }
 export interface DbExpense extends Omit<NewDbExpense, 'amount' | 'ticket' | 'invoice'> {
@@ -227,6 +230,12 @@ export interface QuotationExportOptions {
 }
 
 interface ElectronDbBridge {
+  databaseChallenge(): Promise<{ value?: string; error?: string }>;
+  exportDatabase(): Promise<{ value?: string | null; error?: string }>;
+  importDatabase(): Promise<{ value?: string | null; error?: string }>;
+  deleteDatabase(text: string): Promise<{ value?: boolean; error?: string }>;
+  exportServiceReport(options: { serviceId: number; type: ServiceReportType }): Promise<{ value?: string | null; error?: string }>;
+  exportServiceCalendar(options: { start: string; end: string; format: 'png' | 'pdf' }): Promise<{ value?: string | null; error?: string }>;
   exportQuotation(options: QuotationExportOptions): Promise<{ value?: string | null; error?: string }>;
   exportPendingServices(options: { clientId: number; serviceIds: number[]; format: 'pdf' | 'xlsx' | 'png' }): Promise<{ value?: string | null; error?: string }>;
   sendSync<T>(channel: string, payload?: unknown): T;
@@ -234,6 +243,16 @@ interface ElectronDbBridge {
 
 @Injectable({ providedIn: 'root' })
 export class Db {
+  private async databaseOperation<T>(operation: (bridge: ElectronDbBridge) => Promise<{ value?: T; error?: string }>): Promise<T | undefined> {
+    if (!this.ipcRenderer?.databaseChallenge) throw new Error('Abre o reinicia la aplicación de escritorio para administrar la base de datos.');
+    const result = await operation(this.ipcRenderer);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }
+  async databaseChallenge(): Promise<string> { return await this.databaseOperation(bridge => bridge.databaseChallenge()) ?? ''; }
+  async exportDatabase(): Promise<string | null> { return await this.databaseOperation(bridge => bridge.exportDatabase()) ?? null; }
+  async importDatabase(): Promise<string | null> { return await this.databaseOperation(bridge => bridge.importDatabase()) ?? null; }
+  async deleteDatabase(text: string): Promise<boolean> { return await this.databaseOperation(bridge => bridge.deleteDatabase(text)) ?? false; }
   private readonly ipcRenderer = (window as ElectronWindow).electronDb;
   private fallbackClients: DbClient[] = [];
   private fallbackLinkedCompanies: DbLinkedCompany[] = [];
@@ -662,6 +681,20 @@ export class Db {
   async exportQuotation(options: QuotationExportOptions): Promise<string | null> {
     if (!this.ipcRenderer?.exportQuotation) throw new Error('Abre o reinicia la aplicación de escritorio para exportar cotizaciones.');
     const result = await this.ipcRenderer.exportQuotation(options);
+    if (result.error) throw new Error(result.error);
+    return result.value ?? null;
+  }
+
+  async exportServiceCalendar(start: string, end: string, format: 'png' | 'pdf'): Promise<string | null> {
+    if (!this.ipcRenderer?.exportServiceCalendar) throw new Error('Abre o reinicia la aplicación de escritorio para exportar el calendario.');
+    const result = await this.ipcRenderer.exportServiceCalendar({ start, end, format });
+    if (result.error) throw new Error(result.error);
+    return result.value ?? null;
+  }
+
+  async exportServiceReport(serviceId: number, type: ServiceReportType): Promise<string | null> {
+    if (!this.ipcRenderer?.exportServiceReport) throw new Error('Abre o reinicia la aplicación de escritorio para generar reportes.');
+    const result = await this.ipcRenderer.exportServiceReport({ serviceId, type });
     if (result.error) throw new Error(result.error);
     return result.value ?? null;
   }

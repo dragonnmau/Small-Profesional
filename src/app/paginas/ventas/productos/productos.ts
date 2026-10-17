@@ -93,7 +93,7 @@ export class Productos implements OnInit {
   openEdit(item: DbCatalogItem): void {
     this.editingId = item.id;
     this.packageForm = { kind: item.kind, name: item.name, description: item.description, categoryId: item.categoryId,
-      sku: item.sku ?? '', price: item.price, quantity: item.quantity, unit: item.unit, products: item.products.map(part => ({ productId: part.productId, quantity: part.quantity })) };
+      satCode: item.satCode ?? '', sku: item.sku ?? '', price: item.price, quantity: item.quantity, unit: item.unit, products: item.products.map(part => ({ productId: part.productId, quantity: part.quantity })) };
     this.selected = {}; this.quantities = {};
     for (const part of item.products) { this.selected[part.productId] = true; this.quantities[part.productId] = part.quantity; }
     this.productSearch = ''; this.errors[item.kind] = ''; this.packageOpen = true;
@@ -148,7 +148,7 @@ export class Productos implements OnInit {
     this.categoryError = '';
   }
   private empty(kind: NewDbCatalogItem['kind']): NewDbCatalogItem {
-    return { kind, name: '', description: '', categoryId: null, sku: '', price: 0, quantity: 0, unit: 'Pieza', products: [] };
+    return { kind, name: '', satCode: '', description: '', categoryId: null, sku: '', price: 0, quantity: 0, unit: 'Pieza', products: [] };
   }
   openUnit(target: NewDbCatalogItem): void {
     this.unitTarget = target; this.unitName = ''; this.unitError = ''; this.unitOpen = true;

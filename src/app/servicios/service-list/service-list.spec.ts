@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ServiceList } from './service-list';
-import { DbService } from '../../services/db';
+import { Db, DbService } from '../../services/db';
 
 describe('ServiceList', () => {
   let component: ServiceList;
@@ -20,6 +20,30 @@ describe('ServiceList', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+  it('shows report selection only for existing services and exports the selected type', async () => {
+    component.openForm(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.report-button')).toBeNull();
+    component.openEditForm({ ...component.serviceForm, id: 7, clientId: 1, client: 'Cliente', company: '', assignedUserName: '' } as DbService);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.report-button').click(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('[name="reportType"] option').length).toBe(3);
+    const exportSpy = spyOn(TestBed.inject(Db), 'exportServiceReport').and.resolveTo('C:/Acuse.pdf');
+    component.reportType = 'acknowledgement';
+    await component.generateReport();
+    expect(exportSpy).toHaveBeenCalledOnceWith(7, 'acknowledgement');
+    expect(component.reportMessage).toContain('C:/Acuse.pdf');
+    expect(component.generatingReport).toBeFalse();
+  });
+
+  it('reports export errors and blocks closing while generating', async () => {
+    component.editingServiceId = 7; component.isFormOpen = true; component.generatingReport = true;
+    component.closeForm(); expect(component.isFormOpen).toBeTrue();
+    component.generatingReport = false;
+    spyOn(TestBed.inject(Db), 'exportServiceReport').and.rejectWith(new Error('Error de guardado'));
+    await component.generateReport();
+    expect(component.reportError).toBe('Error de guardado');
+    expect(component.generatingReport).toBeFalse();
   });
   it('muestra el comentario solo en edición y lo coloca después de la descripción', async () => {
     component.openForm(); fixture.detectChanges();

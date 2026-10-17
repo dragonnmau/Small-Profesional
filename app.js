@@ -2,16 +2,24 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     const url = require("url");
     const path = require("path");
   const { ClientDatabase } = require('./database');
+  const { DatabaseMaintenance } = require('./database-maintenance');
   const { exportServices } = require('./services-template-export');
+  const { exportServiceCalendar } = require('./service-calendar-export');
+  const { exportServiceReport } = require('./service-report-export');
 
   const { exportPendingServices } = require('./pending-services-export');
   const { exportQuotation } = require('./quotation-export');
 
     let mainWindow
   let clientDatabase
+  let databaseMaintenance
 
     function initializeDatabase () {
       if (!clientDatabase) clientDatabase = new ClientDatabase(app.getPath('userData'))
+      if (!databaseMaintenance) databaseMaintenance = new DatabaseMaintenance({
+        directory: app.getPath('userData'), getDatabase: () => clientDatabase,
+        setDatabase: database => { clientDatabase = database }, dialog, getParent: () => mainWindow
+      });
     }
 
     function createWindow () {
@@ -38,6 +46,20 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
       mainWindow.on('closed', function () {
         mainWindow = null
       })
+    }
+
+    for (const [channel, action] of [
+      ['database:challenge', () => databaseMaintenance.createChallenge()],
+      ['database:export', () => databaseMaintenance.exportDatabase()],
+      ['database:import', () => databaseMaintenance.importDatabase()],
+      ['database:delete', text => databaseMaintenance.deleteDatabase(text)]
+    ]) {
+      ipcMain.handle(channel, async (event, payload) => {
+        try {
+          if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Solicitud de base de datos no autorizada.');
+          return { value: await action(payload) };
+        } catch (error) { return { error: error.message || 'No se pudo completar la operación de base de datos.' }; }
+      });
     }
 
     ipcMain.on('clients:list', event => { event.returnValue = clientDatabase.listClients() })
@@ -102,6 +124,14 @@ const {app, BrowserWindow, ipcMain, dialog} = require('electron')
     ipcMain.handle('quotations:export', async (event, options) => {
       try { return { value: await exportQuotation(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
       catch (error) { return { error: error.message }; }
+    });
+    ipcMain.handle('services:export-calendar', async (event, options) => {
+      try { return { value: await exportServiceCalendar(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
+      catch (error) { return { error: error.message || 'No se pudo exportar el calendario.' }; }
+    });
+    ipcMain.handle('services:export-report', async (event, options) => {
+      try { return { value: await exportServiceReport(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }
+      catch (error) { return { error: error.message || 'No se pudo generar el reporte.' }; }
     });
     ipcMain.handle('payments:export-pending', async (event, options) => {
       try { return { value: await exportPendingServices(clientDatabase, options, { dialog, BrowserWindow, parent: mainWindow }) }; }

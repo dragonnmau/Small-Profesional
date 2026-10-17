@@ -2,7 +2,8 @@
   <p-toolbar>
     <ng-template #start><p-button icon="pi pi-plus" class="mr-2" severity="secondary" ariaLabel="Agregar" /><p-button
         icon="pi pi-print" class="mr-2" severity="secondary" ariaLabel="Imprimir" /><p-button icon="pi pi-upload"
-        severity="secondary" ariaLabel="Subir" /></ng-template>
+        severity="secondary" ariaLabel="Base de datos" title="Base de datos" (onClick)="openDatabase()" /> <p-splitbutton label="Utilidades" [model]="ultis"
+        appendTo="body"></p-splitbutton></ng-template>
     <ng-template #center><p-iconfield iconPosition="left"><p-inputicon class="pi pi-search" /><input type="text"
           pInputText placeholder="Buscar" /></p-iconfield></ng-template>
     <ng-template #end><label class="theme-switch"
@@ -26,16 +27,18 @@
       <span>{{ businessInformation.commercialName || 'SMALL PROFESIONAL' }}</span>
     </div>
     <nav class="sidebar-navigation" aria-label="Menu principal"><p-panelmenu [model]="items" [multiple]="true"
-        styleClass="service-panel-menu"></p-panelmenu></nav>
+        transitionOptions="250ms cubic-bezier(0.4, 0, 0.2, 1)" styleClass="service-panel-menu"></p-panelmenu></nav>
     <footer class="user-area">
       <div class="user-profile">
-        <p-avatar [image]="userInformation.image || 'https://primefaces.org/cdn/primeng/images/demo/avatar/amyelsner.png'"
+        <p-avatar
+          [image]="userInformation.image || 'https://primefaces.org/cdn/primeng/images/demo/avatar/amyelsner.png'"
           [label]="userInformation.image ? undefined : 'U'" shape="circle" />
         <div class="user-details">
           <strong>{{ userInformation.name || 'Usuario sin configurar' }}</strong>
           <small class="user-type"><i class="pi pi-shield"></i> {{ userInformation.userType }}</small>
           <small *ngIf="userInformation.email"><i class="pi pi-envelope"></i> {{ userInformation.email }}</small>
-          <small *ngIf="userInformation.mobile || userInformation.phone"><i class="pi pi-phone"></i> {{ userInformation.mobile || userInformation.phone }}</small>
+          <small *ngIf="userInformation.mobile || userInformation.phone"><i class="pi pi-phone"></i> {{
+            userInformation.mobile || userInformation.phone }}</small>
         </div>
       </div>
       <div class="user-actions"><button type="button" (click)="lockApp()"><i class="pi pi-lock"></i>Bloquear
@@ -46,3 +49,20 @@
   </aside>
   <section class="content-area"><ng-content></ng-content></section>
 </main>
+<dialog #databaseDialog class="database-dialog" aria-labelledby="database-dialog-title" (cancel)="databaseBusy && $event.preventDefault()">
+  <header><h2 id="database-dialog-title">Base de datos</h2><button type="button" aria-label="Cerrar base de datos" [disabled]="databaseBusy" (click)="databaseDialog.close()"><i class="pi pi-times" aria-hidden="true"></i></button></header>
+  <section><h3>Exportar base de datos</h3><p>Guarda un respaldo completo, incluidos los archivos adjuntos y la información de la empresa.</p><button type="button" [disabled]="databaseBusy" (click)="manageDatabase('export')"><i class="pi pi-download" aria-hidden="true"></i> Exportar</button></section>
+  <section><h3>Importar base de datos</h3><p>Selecciona un respaldo de Small-Profesional. Reemplaza todos los datos actuales y recarga la aplicación después de confirmar.</p><button type="button" [disabled]="databaseBusy" (click)="manageDatabase('import')"><i class="pi pi-upload" aria-hidden="true"></i> Importar</button></section>
+  <section class="database-danger"><h3>Eliminar base de datos</h3><p>Se borrarán todos los registros, archivos adjuntos y datos de empresa y usuario. Esta acción no se puede deshacer. La aplicación se recargará con una base vacía.</p>
+    @if (deleteChallenge) {
+      <label for="database-delete-text">Para eliminar la base de datos escriba el siguiente texto: <strong class="delete-challenge">{{ deleteChallenge }}</strong></label>
+      <input id="database-delete-text" type="text" [(ngModel)]="deleteText" [disabled]="databaseBusy" autocomplete="off" spellcheck="false" placeholder="Escribe el texto exactamente, incluidos los espacios">
+    }
+    <button type="button" class="database-delete-button" [disabled]="!canDeleteDatabase" (click)="manageDatabase('delete')"><i class="pi pi-trash" aria-hidden="true"></i> Eliminar base de datos</button>
+    <small>Se solicitará una confirmación adicional antes de borrar.</small>
+  </section>
+  @if (databaseBusy) { <p role="status">Procesando…</p> }
+  @if (databaseError) { <p class="database-error" role="alert">{{ databaseError }}</p> }
+  @if (databaseMessage) { <p role="status">{{ databaseMessage }}</p> }
+  <footer><button type="button" [disabled]="databaseBusy" (click)="databaseDialog.close()">Cerrar</button></footer>
+</dialog>

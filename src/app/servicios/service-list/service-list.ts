@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ServiceEvidencePanel } from './service-evidence';
-import { Db, DbClient, DbCollaborator, DbLinkedCompany, DbService, NewDbService, ServiceExportOptions } from '../../services/db';
+import { Db, DbClient, DbCollaborator, DbLinkedCompany, DbService, NewDbService, ServiceExportOptions, ServiceReportType } from '../../services/db';
 
 type ServiceStatus = 'Completado' | 'Cancelado en transito' | 'Cancelado' | 'Pendiente';
 type TravelDeposit = 'Si' | 'No' | 'N/A';
@@ -23,6 +23,11 @@ export class ServiceList implements OnInit {
     materialNames: string[] = [];
     selectedMonth = this.currentDate().slice(0, 7);
     isFormOpen = false;
+    isReportOpen = false;
+    reportType: ServiceReportType = 'informative';
+    generatingReport = false;
+    reportError = '';
+    reportMessage = '';
     editingServiceId: number | null = null;
     uploadingEvidence = false;
     search = '';
@@ -43,7 +48,7 @@ export class ServiceList implements OnInit {
         { key: 'Costo final', label: 'Costo final' }
     ];
 
-    constructor(private readonly db: Db) { }
+    constructor(private readonly db: Db, private readonly changeDetector: ChangeDetectorRef) { }
 
     ngOnInit(): void { this.loadData(); }
 
@@ -85,9 +90,20 @@ export class ServiceList implements OnInit {
 
     trackCalendarDay(index: number, cell: CalendarDay | null): string | number { return cell?.date ?? index; }
 
-    openForm(date?: string): void { this.editingServiceId = null; this.serviceForm = this.emptyForm(); if (date) this.serviceForm.date = date; this.isFormOpen = true; }
-    openEditForm(service: DbService): void { this.editingServiceId = service.id; this.serviceForm = { ...service, materials: service.materials.map(material => ({ ...material })) }; this.isFormOpen = true; }
-    closeForm(): void { if (!this.uploadingEvidence) this.isFormOpen = false; }
+    openForm(date?: string): void { this.resetReport(); this.editingServiceId = null; this.serviceForm = this.emptyForm(); if (date) this.serviceForm.date = date; this.isFormOpen = true; }
+    openEditForm(service: DbService): void { this.resetReport(); this.editingServiceId = service.id; this.serviceForm = { ...service, materials: service.materials.map(material => ({ ...material })) }; this.isFormOpen = true; }
+    closeForm(): void { if (!this.uploadingEvidence && !this.generatingReport) this.isFormOpen = false; }
+    private resetReport(): void { this.isReportOpen = false; this.reportError = ''; this.reportMessage = ''; this.reportType = 'informative'; }
+    async generateReport(): Promise<void> {
+        if (this.editingServiceId === null || this.generatingReport || this.uploadingEvidence) return;
+        this.generatingReport = true; this.reportError = ''; this.reportMessage = '';
+        try {
+            const filePath = await this.db.exportServiceReport(this.editingServiceId, this.reportType);
+            if (filePath) this.reportMessage = `Reporte guardado en: ${filePath}`;
+        } catch (error) {
+            this.reportError = error instanceof Error ? error.message : 'No se pudo generar el reporte.';
+        } finally { this.generatingReport = false; this.changeDetector.detectChanges(); }
+    }
     openExport(): void {
         this.exportMonth = this.selectedMonth || 'all'; this.exportClientId = null; this.exportCompanyId = null;
         this.exportFields = Object.fromEntries(this.exportCostFields.map(field => [field.key, true])); this.isExportOpen = true;
@@ -114,7 +130,7 @@ export class ServiceList implements OnInit {
     }
 
     saveService(): void {
-        if (this.serviceForm.clientId === null || this.uploadingEvidence) return;
+        if (this.serviceForm.clientId === null || this.uploadingEvidence || this.generatingReport) return;
         this.updateMaterialsCost();
         const values: NewDbService = {
             ...(this.editingServiceId !== null ? { internalComment: (this.serviceForm.internalComment ?? '').trim() } : {}),

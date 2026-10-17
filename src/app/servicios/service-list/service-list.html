@@ -23,7 +23,7 @@
         (dblclick)="cell && openForm(cell.date)" (keydown.enter)="cell && $event.target === $event.currentTarget && openForm(cell.date)"><ng-container
           *ngIf="cell"><strong>{{ cell.day }}</strong><button class="calendar-service"
             *ngFor="let service of cell.services" type="button" [class.paid]="isPaid(service)" [class.completed]="service.status === 'Completado'"
-            [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'" [class.pending]="service.status === 'Pendiente'" (click)="openEditForm(service)" (dblclick)="$event.stopPropagation()"
+            [class.cancelled]="service.status === 'Cancelado en transito' || service.status === 'Cancelado'" [class.pending]="service.status === 'Pendiente'" [class.in-progress]="service.status === 'En proceso'" (click)="openEditForm(service)" (dblclick)="$event.stopPropagation()"
             [title]="service.client">{{ service.time }} · {{ service.folio || service.client }}</button></ng-container></div>
     </div>
     <p class="calendar-note"><i class="pi pi-info-circle"></i> Haz doble clic en un día para agregar un servicio con esa fecha, o enfócalo y presiona Enter. Selecciona un servicio para editarlo.
@@ -84,9 +84,9 @@
   <section class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
     <header>
       <div>
-        <h3>{{ editingServiceId === null ? 'Agregar servicio' : 'Editar servicio' }}</h3>
+        <h3>{{ editingServiceId === null ? 'Agregar servicio' : 'Editar servicio - ID: ' + editingServiceId }}</h3>
         <p>Captura la informacion y los costos del servicio.</p>
-      </div><button class="icon-button" type="button" aria-label="Cerrar" [disabled]="uploadingEvidence" (click)="closeForm()"><i
+      </div><button class="icon-button" type="button" aria-label="Cerrar" [disabled]="uploadingEvidence || generatingReport" (click)="closeForm()"><i
           class="pi pi-times"></i></button>
     </header>
     <form (ngSubmit)="saveService()">
@@ -97,6 +97,7 @@
             <option>Cancelado en transito</option>
             <option>Cancelado</option>
             <option>Pendiente</option>
+            <option>En proceso</option>
           </select></label><label>Servicio pagado<select name="servicePaid" [(ngModel)]="serviceForm.servicePaid"><option>Si</option><option>No</option></select></label></div>
       <div class="form-grid three"><label>Cliente<select name="clientId" [(ngModel)]="serviceForm.clientId"
         (ngModelChange)="onClientChange()" required><option [ngValue]="null">Selecciona un cliente</option><option
@@ -146,8 +147,25 @@
       @if (editingServiceId !== null) {
         <app-service-evidence [serviceId]="editingServiceId" (busyChange)="uploadingEvidence = $event" />
       }
-      <footer><button class="secondary-button" type="button" [disabled]="uploadingEvidence" (click)="closeForm()">Cancelar</button><button
-          class="primary-button" type="submit" [disabled]="uploadingEvidence">{{ editingServiceId === null ? 'Guardar servicio' : 'Guardar cambios'
+      @if (editingServiceId !== null && isReportOpen) {
+        <section class="report-options" aria-label="Generar reporte del servicio">
+          <h4>Generar reporte</h4>
+          <p>Se utilizará la información guardada del servicio. Guarda los cambios antes de generar el PDF.</p>
+          <label>Tipo de reporte<select name="reportType" [(ngModel)]="reportType" [disabled]="generatingReport">
+            <option value="informative">Reporte informativo</option><option value="acknowledgement">Reporte de acuse</option><option value="log">Bitácora de servicio</option>
+          </select></label>
+          @if (reportType === 'informative') { <p>Información completa y desglose de costos del servicio.</p> }
+          @if (reportType === 'acknowledgement') { <p>Información del servicio, costo de servicio, viáticos y firmas del ingeniero y cliente.</p> }
+          @if (reportType === 'log') { <p>Información sin costos, espacio para acciones tomadas, seis renglones de equipos y firmas.</p> }
+          @if (reportError) { <p class="report-error" role="alert">{{ reportError }}</p> }
+          @if (reportMessage) { <p role="status">{{ reportMessage }}</p> }
+          <button class="primary-button" type="button" [disabled]="generatingReport || uploadingEvidence" (click)="generateReport()">{{ generatingReport ? 'Generando…' : 'Generar PDF' }}</button>
+        </section>
+      }
+      <footer>
+        @if (editingServiceId !== null) { <button class="outline-button report-button" type="button" [disabled]="uploadingEvidence || generatingReport" [attr.aria-expanded]="isReportOpen" (click)="isReportOpen = !isReportOpen"><i class="pi pi-file-pdf"></i> Generar reporte</button> }
+        <button class="secondary-button" type="button" [disabled]="uploadingEvidence || generatingReport" (click)="closeForm()">Cancelar</button><button
+          class="primary-button" type="submit" [disabled]="uploadingEvidence || generatingReport">{{ editingServiceId === null ? 'Guardar servicio' : 'Guardar cambios'
           }}</button></footer>
     </form>
   </section>

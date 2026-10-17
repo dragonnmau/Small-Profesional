@@ -13,8 +13,8 @@ class ClientDatabase {
   constructor(userDataPath) {
     this.db = new Database(path.join(userDataPath, 'SMpro.db'));
     
-    this.db.pragma('journal_mode = WAL');
-    this.setupDatabase();
+    try { this.db.pragma('journal_mode = WAL'); this.setupDatabase(); }
+    catch (error) { this.db.close(); throw error; }
   }
 
   setupDatabase() {
@@ -41,6 +41,9 @@ class ClientDatabase {
       this.db.exec('ALTER TABLE catalog_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0)');
     }
     this.db.exec('CREATE TABLE IF NOT EXISTS catalog_sku_sequence (id INTEGER PRIMARY KEY CHECK (id = 1), value INTEGER NOT NULL)');
+    if (!this.db.prepare('PRAGMA table_info(catalog_items)').all().some(column => column.name === 'sat_code')) {
+      this.db.exec("ALTER TABLE catalog_items ADD COLUMN sat_code TEXT NOT NULL DEFAULT ''");
+    }
     this.db.exec('INSERT OR IGNORE INTO catalog_sku_sequence (id, value) VALUES (1, 0)');
     this.db.exec('CREATE TABLE IF NOT EXISTS catalog_units (name TEXT NOT NULL, normalized_name TEXT NOT NULL UNIQUE)');
     for (const name of ['pieza', 'mts', 'bobina']) this.createCatalogUnit(name);
@@ -461,7 +464,7 @@ class ClientDatabase {
     const components = this.db.prepare(`SELECT p.package_id AS packageId, p.product_id AS productId, i.name, i.sku, i.unit, p.quantity
       FROM catalog_package_items p JOIN catalog_items i ON i.id = p.product_id ORDER BY i.name`).all();
     return this.db.prepare(`SELECT i.id, i.kind, i.name, i.description, i.category_id AS categoryId,
-      c.name AS category, i.sku, i.quantity, i.unit, i.price_cents / 100.0 AS price FROM catalog_items i
+      c.name AS category, i.sku, i.sat_code AS satCode, i.quantity, i.unit, i.price_cents / 100.0 AS price FROM catalog_items i
       LEFT JOIN catalog_categories c ON c.id = i.category_id ORDER BY i.id DESC`).all()
       .map(item => ({ ...item, products: components.filter(part => part.packageId === item.id)
         .map(({ productId, name, sku, quantity, unit }) => ({ productId, name, sku, quantity, unit })) }));
@@ -501,6 +504,8 @@ class ClientDatabase {
       if (!request || !['Producto', 'Servicio', 'Paquete'].includes(request.kind)) throw new Error('Selecciona un tipo válido.');
       if (typeof request.name !== 'string' || !request.name.trim() || request.name.trim().length > 150) throw new Error('Ingresa un nombre de hasta 150 caracteres.');
       const description = request.description ?? '';
+      const satCode = request.satCode ?? '';
+      if (typeof satCode !== 'string' || (satCode.trim() && !/^\d{8}$/.test(satCode.trim()))) throw new Error('La clave de catalogo SAT debe tener 8 digitos o quedar vacia.');
       if (typeof description !== 'string' || description.length > 2000) throw new Error('La descripción admite hasta 2000 caracteres.');
       const sku = request.sku == null ? null : typeof request.sku === 'string' ? request.sku.trim() || null : false;
       if (sku === false || (sku && sku.length > 80)) throw new Error('El SKU admite hasta 80 caracteres.');
@@ -527,12 +532,12 @@ class ClientDatabase {
       }
       let id = editingId;
       if (id === null) {
-        const result = this.db.prepare(`INSERT INTO catalog_items (kind, name, description, category_id, sku, price_cents, quantity, unit)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(request.kind, request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit);
+        const result = this.db.prepare(`INSERT INTO catalog_items (kind, name, description, category_id, sku, price_cents, quantity, unit, sat_code)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(request.kind, request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit, satCode.trim());
         id = Number(result.lastInsertRowid);
       } else {
-        this.db.prepare('UPDATE catalog_items SET name = ?, description = ?, category_id = ?, sku = ?, price_cents = ?, quantity = ?, unit = ? WHERE id = ?')
-          .run(request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit, id);
+        this.db.prepare('UPDATE catalog_items SET name = ?, description = ?, category_id = ?, sku = ?, price_cents = ?, quantity = ?, unit = ?, sat_code = ? WHERE id = ?')
+          .run(request.name.trim(), description.trim(), categoryId, sku, Math.round(price * 100), quantity, unit, satCode.trim(), id);
         this.db.prepare('DELETE FROM catalog_package_items WHERE package_id = ?').run(id);
       }
       const insert = this.db.prepare('INSERT INTO catalog_package_items (package_id, product_id, quantity) VALUES (?, ?, ?)');
@@ -604,7 +609,7 @@ class ClientDatabase {
       const previous = this.db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
       if (!previous) throw new Error('El gasto no existe.');
       const { validateExpense } = require('./expense-validation');
-      const expense = validateExpense(request, previous.iva_mode === 'none' ? this.getTaxSettings().ivaRate : previous.iva_rate);
+      const expense = validateExpense(request, ['none', 'custom'].includes(previous.iva_mode) ? this.getTaxSettings().ivaRate : previous.iva_rate);
       const sameSource = expense.accountId === previous.account_id && (request.cardId ?? null) === previous.card_id;
       expense.cardId = sameSource ? previous.card_id : this.validateOperationCard(expense.accountId, request.cardId);
       const account = this.db.prepare('SELECT balance, status FROM bank_accounts WHERE id = ?').get(expense.accountId);

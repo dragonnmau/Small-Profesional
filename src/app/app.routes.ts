@@ -18,6 +18,10 @@ import { DashboardConta } from './paginas/contabilidad/dashboard-conta/dashboard
 import { AnoFiscal } from './paginas/contabilidad/ano-fiscal/ano-fiscal';
 import { Productos } from './paginas/ventas/productos/productos';
 import { Cotizador } from './paginas/ventas/cotizador/cotizador';
+import { DashboardServs } from './paginas/servicios/dashboard-servs/dashboard-servs';
+import { Desglose } from './paginas/servicios/desglose/desglose';
+import { Airhockey } from './paginas/toolbox/airhockey/airhockey';
+import { Solitarie } from './paginas/toolbox/solitarie/solitarie';
 
 export const routes: Routes = [
     //Dashboard
@@ -27,10 +31,17 @@ export const routes: Routes = [
     },
 
      ///Servicios
-
+    {   
+        path: 'servicios/dashboard',
+        component: DashboardServs,
+    },
     {   
         path: 'servicios/serviceList',
         component: ServiceList,
+    },
+    {   
+        path: 'servicios/desglose',
+        component: Desglose,
     },
 
     //tareas
@@ -114,7 +125,16 @@ export const routes: Routes = [
 
     
 
-    //
+    //toolbox
+    {
+        path: 'toolbox/airhockey',
+        component: Airhockey,
+    },
+    {
+        path: 'toolbox/solitarie',
+        component: Solitarie,
+    },
+    
     
     //Configuración
 

@@ -1,4 +1,5 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { ButtonModule } from 'primeng/button';
 import { MenuItem } from 'primeng/api';
@@ -21,7 +22,7 @@ import { Db, DbAccountInformation } from '../services/db';
     selector: 'app-sidemenu',
     imports: [
         MatSidenavModule, ButtonModule, InputTextModule, InputIcon, PanelMenu,
-        Toolbar, BadgeModule, CommonModule, AvatarModule, IconField, SplitButton,
+        Toolbar, BadgeModule, CommonModule, AvatarModule, IconField, SplitButton, FormsModule,
     ],
     templateUrl: './sidemenu.html',
     styleUrl: './sidemenu.scss'
@@ -29,7 +30,77 @@ import { Db, DbAccountInformation } from '../services/db';
 
 
 export class Sidemenu implements OnInit {
+    @ViewChild('databaseDialog') databaseDialog?: ElementRef<HTMLDialogElement>;
+    databaseBusy = false;
+    deleteChallenge = '';
+    deleteText = '';
+    databaseError = '';
+    databaseMessage = '';
+    get canDeleteDatabase(): boolean { return !this.databaseBusy && !!this.deleteChallenge && this.deleteText === this.deleteChallenge; }
+
+    async openDatabase(): Promise<void> {
+        if (this.databaseBusy) return;
+        this.deleteText = ''; this.deleteChallenge = ''; this.databaseError = ''; this.databaseMessage = '';
+        this.databaseDialog?.nativeElement.showModal();
+        this.databaseBusy = true;
+        try { this.deleteChallenge = await this.dbService.databaseChallenge(); }
+        catch (error) { this.databaseError = error instanceof Error ? error.message : 'No se pudo preparar la administración de la base de datos.'; }
+        finally { this.databaseBusy = false; this.changeDetector.detectChanges(); }
+    }
+
+    async manageDatabase(action: 'export' | 'import' | 'delete'): Promise<void> {
+        if (this.databaseBusy || (action === 'delete' && !this.canDeleteDatabase)) return;
+        this.databaseBusy = true; this.databaseError = ''; this.databaseMessage = '';
+        try {
+            if (action === 'export') {
+                const file = await this.dbService.exportDatabase();
+                if (file) this.databaseMessage = `Base de datos exportada en: ${file}`;
+            } else {
+                const changed = action === 'import' ? await this.dbService.importDatabase() : await this.dbService.deleteDatabase(this.deleteText);
+                if (changed) window.location.reload();
+            }
+        } catch (error) { this.databaseError = error instanceof Error ? error.message : 'No se pudo completar la operación.'; }
+        finally { this.databaseBusy = false; this.changeDetector.detectChanges(); }
+    }
     items: MenuItem[] | undefined;
+    ultis = [
+        {
+            label: 'Cambiar Tema',
+            icon: 'pi pi-sun',
+            command: () => {
+                this.toggleTheme();
+            }
+        },
+        {
+            label: 'Cerrar Sesión',
+            icon: 'pi pi-sign-out',
+            command: () => {
+                this.logout();
+            }
+        },
+        {
+            label: 'Juegos',
+            icon: 'pi pi-gamepad',
+            items: [
+                {
+                    label: 'Air Hockey',
+                    icon: 'pi pi-gamepad',
+                    command: () => {
+                        this.router.navigate(['/toolbox/airhockey']);
+
+                    }
+                },
+                {
+                    label: 'Solitarie',
+                    icon: 'pi pi-gamepad',
+                    command: () => {
+                        this.router.navigate(['/toolbox/solitarie']);
+
+                    }
+                },
+            ]
+        }
+    ]
     isDarkTheme = false;
     accountInformation: DbAccountInformation | null = null;
 
@@ -45,7 +116,7 @@ export class Sidemenu implements OnInit {
         };
     }
 
-    constructor(private router: Router, private readonly dbService: Db) {
+    constructor(private router: Router, private readonly dbService: Db, private readonly changeDetector: ChangeDetectorRef) {
 
     }
 
@@ -60,7 +131,7 @@ export class Sidemenu implements OnInit {
         this.items = [
             {
                 label: 'Inicio',
-                icon: 'pi pi-home',
+                icon: 'pi pi-desktop',
                 items: [
                     {
                         label: 'Dashboard - imp',
@@ -74,16 +145,14 @@ export class Sidemenu implements OnInit {
             },
             {
                 label: 'Servicios',
+                icon: 'pi pi-briefcase',
                 items: [
                     {
                         label: 'Dashboard',
                         icon: 'pi pi-cog',
-                        badge: 'PROXIMAMENTE',
-                        styleClass: 'unavailable-menu-item',
-                        disabled: true,
                         shortcut: '⌘+O',
                         command: () => {
-                            this.router.navigate(['/services']);
+                            this.router.navigate(['/servicios/dashboard']);
                         }
                     },
                     {
@@ -92,6 +161,14 @@ export class Sidemenu implements OnInit {
                         shortcut: '⌘+O',
                         command: () => {
                             this.router.navigate(['/servicios/serviceList']);
+                        }
+                    },
+                    {
+                        label: 'Desglose Costos de Servicios',
+                        icon: 'pi pi-cog',
+                        shortcut: '⌘+O',
+                        command: () => {
+                            this.router.navigate(['/servicios/desglose']);
                         }
                     },
                     {
@@ -122,7 +199,7 @@ export class Sidemenu implements OnInit {
                             this.router.navigate(['/taskList']);
                         }
                          */
-                        
+
                     },
                     {
                         label: 'Planificador',
@@ -137,7 +214,7 @@ export class Sidemenu implements OnInit {
                         }
                          * 
                          */
-                        
+
                     },
                     {
                         label: 'Kanban',
@@ -151,7 +228,7 @@ export class Sidemenu implements OnInit {
                             this.router.navigate(['/kanban']);
                         }
                          */
-                        
+
                     },
                     {
                         label: 'Gantt',
@@ -170,10 +247,11 @@ export class Sidemenu implements OnInit {
             },
             {
                 label: 'Contabilidad',
+                icon: 'pi pi-money-bill',
                 items: [
                     {
                         label: 'General',
-                        icon: 'pi pi-cog', 
+                        icon: 'pi pi-cog',
                         command: () => {
                             this.router.navigate(['/DashboardConta']);
                         }
@@ -233,7 +311,7 @@ export class Sidemenu implements OnInit {
             },
             {
                 label: 'Ventas',
-                icon: 'pi pi-home',
+                icon: 'pi pi-receipt',
                 items: [
                     {
                         label: 'Productos & Servicios',
@@ -271,6 +349,7 @@ export class Sidemenu implements OnInit {
             },
             {
                 label: 'Empresa',
+                icon: 'pi pi-building',
                 items: [
                     {
                         label: 'Clientes',

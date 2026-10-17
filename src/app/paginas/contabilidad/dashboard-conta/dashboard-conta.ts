@@ -13,6 +13,27 @@ interface PeriodSummary {
   expenseCount: number;
 }
 
+interface ExpenseCategorySummary {
+  category: string;
+  totalCents: number;
+  count: number;
+  color: string;
+  percentage: number;
+  offset: number;
+  barWidth: number;
+}
+
+interface IncomeClientSummary {
+  clientId: number;
+  client: string;
+  totalCents: number;
+  count: number;
+  color: string;
+  percentage: number;
+  offset: number;
+  barWidth: number;
+}
+
 @Component({
   selector: 'app-dashboard-conta',
   imports: [CommonModule, FormsModule, RouterLink],
@@ -57,6 +78,56 @@ export class DashboardConta implements OnInit {
   }
   get filteredExpenses(): DbExpense[] { return this.expenses.filter(item => this.inPeriod(item.expenseDate)); }
 
+  get expenseCategoryChart(): { categories: ExpenseCategorySummary[]; totalCents: number; count: number } {
+    const groups = new Map<string, { totalCents: number; count: number }>();
+    for (const expense of this.filteredExpenses) {
+      const category = expense.category?.trim() || 'Sin categoría';
+      const group = groups.get(category) ?? { totalCents: 0, count: 0 };
+      group.totalCents += Math.round(expense.total * 100);
+      group.count++;
+      groups.set(category, group);
+    }
+    const sorted = [...groups.entries()].sort((a, b) => b[1].totalCents - a[1].totalCents || a[0].localeCompare(b[0], 'es'));
+    const totalCents = sorted.reduce((sum, [, group]) => sum + group.totalCents, 0);
+    const maxCents = Math.max(0, ...sorted.map(([, group]) => group.totalCents));
+    const palette = ['#6366f1', '#0d9488', '#d99119', '#db5563', '#8b5cf6', '#0284c7', '#a16207', '#c026d3'];
+    const names = [...new Set(this.expenses.map(expense => expense.category?.trim() || 'Sin categoría'))].sort((a, b) => a.localeCompare(b, 'es'));
+    let offset = 0;
+    const categories = sorted.map(([category, group]) => {
+      const percentage = totalCents > 0 ? group.totalCents / totalCents * 100 : 0;
+      const row = { category, ...group, color: palette[names.indexOf(category) % palette.length], percentage, offset,
+        barWidth: maxCents > 0 ? group.totalCents / maxCents * 100 : 0 };
+      offset += percentage;
+      return row;
+    });
+    return { categories, totalCents, count: categories.reduce((sum, category) => sum + category.count, 0) };
+  }
+
+  get incomeClientChart(): { clients: IncomeClientSummary[]; totalCents: number; count: number } {
+    const groups = new Map<number, { client: string; totalCents: number; count: number }>();
+    for (const payment of this.filteredPayments) {
+      const clientId = payment.clientId ?? 0;
+      const group = groups.get(clientId) ?? { client: payment.client?.trim() || 'Sin cliente', totalCents: 0, count: 0 };
+      group.totalCents += Math.round(payment.amount * 100);
+      group.count++;
+      groups.set(clientId, group);
+    }
+    const sorted = [...groups.entries()].sort((a, b) => b[1].totalCents - a[1].totalCents || a[1].client.localeCompare(b[1].client, 'es') || a[0] - b[0]);
+    const totalCents = sorted.reduce((sum, [, group]) => sum + group.totalCents, 0);
+    const maxCents = Math.max(0, ...sorted.map(([, group]) => group.totalCents));
+    const palette = ['#0d9488', '#6366f1', '#d99119', '#0284c7', '#8b5cf6', '#db5563', '#a16207', '#c026d3'];
+    const clientIds = [...new Set(this.payments.map(payment => payment.clientId ?? 0))].sort((a, b) => a - b);
+    let offset = 0;
+    const clients = sorted.map(([clientId, group]) => {
+      const percentage = totalCents > 0 ? group.totalCents / totalCents * 100 : 0;
+      const row = { clientId, ...group, color: palette[clientIds.indexOf(clientId) % palette.length], percentage, offset,
+        barWidth: maxCents > 0 ? group.totalCents / maxCents * 100 : 0 };
+      offset += percentage;
+      return row;
+    });
+    return { clients, totalCents, count: clients.reduce((sum, client) => sum + client.count, 0) };
+  }
+
   private summarize(periods: { key: string; label: string }[], daily = false): PeriodSummary[] {
     const groups = new Map(periods.map(period => [period.key, { ...period, incomeCents: 0, expenseCents: 0, paymentCount: 0, expenseCount: 0 }]));
     for (const payment of this.filteredPayments) {
@@ -87,7 +158,7 @@ export class DashboardConta implements OnInit {
         key: `${this.filterYear}-${this.filterMonth}-${String(index + 1).padStart(2, '0')}`, label: String(index + 1)
       })), true);
     }
-    const max = Math.max(100, ...periods.flatMap(period => [period.incomeCents, period.expenseCents]));
+    const max = Math.max(1500000, ...periods.flatMap(period => [period.incomeCents, period.expenseCents]));
     const scale = 10 ** Math.floor(Math.log10(max));
     const ceiling = Math.ceil(max / scale) * scale;
     const points = periods.map((period, index) => ({ ...period,
@@ -100,6 +171,7 @@ export class DashboardConta implements OnInit {
       points,
       incomeLine: points.map(point => `${point.x},${point.incomeY}`).join(' '),
       expenseLine: points.map(point => `${point.x},${point.expenseY}`).join(' '),
+      goalY: 290 - 1500000 / ceiling * 240,
       ticks: Array.from({ length: 5 }, (_, index) => ({ y: 290 - index * 60, amount: ceiling * index / 4 / 100 }))
     };
   }

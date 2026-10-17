@@ -155,8 +155,13 @@
           class="pi pi-times"></i></button>
     </header>
     <form #packageEntry="ngForm" (ngSubmit)="save(packageForm, packageEntry)">
-      <label>Nombre *<input name="name" [(ngModel)]="packageForm.name" required pattern=".*\S.*" maxlength="150"
+      <div class="form-grid"><label>Nombre *<input name="name" [(ngModel)]="packageForm.name" required pattern=".*\S.*" maxlength="150"
           placeholder="Ej. Kit de instalación"></label>
+        <label *ngIf="editingId !== null">Clave de catálogo SAT <span class="optional">Opcional</span><input name="satCode"
+            [(ngModel)]="packageForm.satCode" inputmode="numeric" pattern="[0-9]{8}" maxlength="8"
+            placeholder="Clave de 8 dígitos" #satCode="ngModel">
+          <small class="error" *ngIf="satCode.invalid && (satCode.dirty || satCode.touched)">Ingresa 8 dígitos o deja el campo vacío.</small></label>
+      </div>
       <div class="form-grid"><label>Categoría<select name="categoryId" [ngModel]="packageForm.categoryId" #packageCategorySelect="ngModel" (ngModelChange)="selectCategory(packageForm, $event, packageCategorySelect)">
             <option [ngValue]="null">Sin categoría</option>
             <option *ngFor="let category of categories" [ngValue]="category.id">{{ category.name }}</option>

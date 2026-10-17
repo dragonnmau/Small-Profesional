@@ -1,0 +1,92 @@
+<div class="services-dashboard">
+  <header class="page-header">
+    <div><span class="eyebrow">Servicios · Resumen operativo</span><h1>Dashboard de servicios</h1><p>El estado del mes y el detalle de tu semana, en un solo lugar.</p></div>
+    <a class="button primary" routerLink="/servicios/serviceList"><i class="pi pi-list"></i> Lista de servicios</a>
+  </header>
+
+  <section class="panel month-toolbar" aria-label="Seleccionar mes">
+    <div class="month-controls">
+      <button type="button" (click)="moveMonth(-1)" aria-label="Mes anterior"><i class="pi pi-chevron-left"></i></button>
+      <label>Mes del resumen<input type="month" [(ngModel)]="selectedMonth" (ngModelChange)="selectMonth()"></label>
+      <button type="button" (click)="moveMonth(1)" aria-label="Mes siguiente"><i class="pi pi-chevron-right"></i></button>
+    </div>
+    <span class="period">{{ monthTitle }} · {{ monthServices.length }} servicios</span>
+    <button type="button" (click)="refresh()"><i class="pi pi-refresh"></i> Actualizar</button>
+  </section>
+  @if (error) { <p class="error" role="alert">{{ error }}</p> }
+
+  <section class="summary" aria-label="Estados de servicios del mes">
+    <button type="button" class="panel summary-card pending" [class.selected]="statusFilter === 'pending'" [attr.aria-pressed]="statusFilter === 'pending'" (click)="toggleFilter('pending')">
+      <span class="card-heading">Pendientes<i class="pi pi-clock"></i></span><strong>{{ summary.pending }}</strong><span>Servicios por realizar</span>
+    </button>
+    <button type="button" class="panel summary-card completed" [class.selected]="statusFilter === 'completed'" [attr.aria-pressed]="statusFilter === 'completed'" (click)="toggleFilter('completed')">
+      <span class="card-heading">Completados<i class="pi pi-check-circle"></i></span><strong>{{ summary.completed }}</strong><span>Servicios finalizados</span>
+    </button>
+    <button type="button" class="panel summary-card cancelled" [class.selected]="statusFilter === 'cancelled'" [attr.aria-pressed]="statusFilter === 'cancelled'" (click)="toggleFilter('cancelled')">
+      <span class="card-heading">Cancelados<i class="pi pi-times-circle"></i></span><strong>{{ summary.cancelled }}</strong><span>Incluye cancelados en tránsito</span>
+    </button>
+  </section>
+
+  <section class="panel progress-panel" aria-label="Avance mensual">
+    <div><h2>Avance del mes</h2><p>{{ summary.completed }} de {{ monthServices.length }} servicios completados</p></div>
+    <div class="progress-track" role="progressbar" aria-label="Porcentaje completado" [attr.aria-valuenow]="completionRate" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="completionRate"></span></div>
+    <strong>{{ completionRate }}%</strong>
+  </section>
+
+  <section class="panel weekly-panel">
+    <div class="section-heading"><div><span class="eyebrow">Agenda semanal</span><h2>Servicios por semana</h2><p>Semanas de lunes a domingo. Se muestran los días del mes seleccionado.</p></div><span class="week-count">{{ weekServices.length }} servicios esta semana</span></div>
+    <div class="week-toolbar">
+      <button type="button" class="button" (click)="openExport()" [disabled]="exporting || !!error"><i class="pi pi-download"></i> Exportar calendario</button>
+      <button type="button" (click)="weekIndex = weekIndex - 1" [disabled]="weekIndex === 0" aria-label="Semana anterior"><i class="pi pi-chevron-left"></i></button>
+      <label class="week-select">Semana<select [(ngModel)]="weekIndex">@for (week of weeks; track $index) { <option [ngValue]="$index">Semana {{ $index + 1 }} · {{ week.label }}</option> }</select></label>
+      <button type="button" (click)="weekIndex = weekIndex + 1" [disabled]="weekIndex >= weeks.length - 1" aria-label="Semana siguiente"><i class="pi pi-chevron-right"></i></button>
+      <label class="status-select">Estado<select [(ngModel)]="statusFilter"><option value="">Todos los estados</option><option value="pending">Pendientes</option><option value="completed">Completados</option><option value="cancelled">Cancelados</option></select></label>
+    </div>
+    @if (exportMessage) { <p class="export-message" role="status">{{ exportMessage }}</p> }
+    @if (!monthServices.length && !error) { <div class="empty-month"><i class="pi pi-calendar"></i><h3>Este mes aún no tiene servicios</h3><p>Los servicios registrados aparecerán aquí según su fecha.</p><a routerLink="/servicios/serviceList">Ir a la lista de servicios</a></div> }
+    @else {
+      @if (!visibleCount) { <p class="empty-message" role="status">No hay servicios para esta semana{{ statusFilter ? ' con el estado seleccionado' : '' }}.</p> }
+      <div class="week-grid">
+        @for (day of weekDays; track day.date) {
+          <section class="day-column"><header><h3>{{ day.label }}</h3><span>{{ day.services.length }}</span></header>
+            @for (service of day.services; track service.id) {
+              <button type="button" [class]="'service-card ' + statusGroup(service)" (click)="openDetail(service)" [attr.aria-label]="'Ver detalle de ' + (service.folio || 'servicio sin folio') + ', ' + service.client">
+                <span class="service-time"><i class="pi pi-clock"></i> {{ service.time || 'Sin horario' }}<span class="status-badge">{{ service.status }}</span></span>
+                <strong>{{ service.client }}</strong><span class="folio">{{ service.folio || 'Sin folio' }}</span>
+                @if (service.company) { <span>{{ service.company }}</span> }
+                <p>{{ service.description || 'Sin descripción' }}</p>
+                <span class="service-meta"><i class="pi pi-map-marker"></i>{{ service.site || 'Sin sitio' }}{{ service.city ? ' · ' + service.city : '' }}</span>
+                <span class="service-meta"><i class="pi pi-user"></i>{{ service.assignedUserName || 'Sin asignar' }}</span>
+                <span class="service-footer"><span>{{ total(service) | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN</span><span>Ver detalle <i class="pi pi-arrow-right"></i></span></span>
+              </button>
+            } @empty { <p class="day-empty">Sin servicios{{ statusFilter ? ' con este estado' : '' }}</p> }
+          </section>
+        }
+      </div>
+    }
+  </section>
+
+  <dialog #exportDialog class="detail-panel" aria-labelledby="export-calendar-title" (cancel)="exporting && $event.preventDefault()">
+    <h2 id="export-calendar-title">Exportar calendario</h2>
+    <p>Semana {{ weekIndex + 1 }} · {{ activeWeek.label }}</p>
+    <p class="export-description">Se incluyen todos los servicios de esta semana, sin aplicar el filtro de estado.</p>
+    <label>Formato<select [(ngModel)]="exportFormat" [disabled]="exporting"><option value="pdf">PDF</option><option value="png">Imagen PNG</option></select></label>
+    @if (exportError) { <p class="error" role="alert">{{ exportError }}</p> }
+    <div class="export-actions">
+      <button type="button" (click)="exportDialog.close()" [disabled]="exporting">Cancelar</button>
+      <button type="button" class="primary" (click)="exportCalendar()" [disabled]="exporting">{{ exporting ? 'Exportando…' : 'Exportar' }}</button>
+    </div>
+  </dialog>
+  @if (selectedService; as service) {
+    <dialog #detailDialog class="detail-panel" aria-labelledby="service-detail-title" (cancel)="selectedService = null">
+      <header class="section-heading"><div><span class="eyebrow">Detalle del servicio</span><h2 id="service-detail-title">{{ service.folio || 'Sin folio' }}</h2></div><button type="button" autofocus (click)="selectedService = null" aria-label="Cerrar detalle"><i class="pi pi-times"></i></button></header>
+      <span [class]="'status-badge ' + statusGroup(service)">{{ service.status }}</span>
+      <h3>{{ service.client }}</h3><p class="description">{{ service.description || 'Sin descripción' }}</p>
+      <dl class="details"><div><dt>Fecha y hora</dt><dd>{{ service.date }} · {{ service.time || 'Sin horario' }}</dd></div><div><dt>Empresa</dt><dd>{{ service.company || 'Sin empresa vinculada' }}</dd></div><div><dt>Ubicación</dt><dd>{{ service.site || 'Sin sitio' }} · {{ service.city || 'Sin ciudad' }}</dd></div><div><dt>Responsable</dt><dd>{{ service.assignedUserName || 'Sin asignar' }}</dd></div><div><dt>Pago del servicio</dt><dd>{{ isPaid(service) ? 'Pagado' : 'Pendiente de pago' }}</dd></div><div><dt>Depósito de viático</dt><dd>{{ service.travelDeposit }}</dd></div></dl>
+      <h3>Desglose de costos</h3>
+      <dl class="costs"><div><dt>Servicio</dt><dd>{{ service.serviceCost | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>Viático</dt><dd>{{ service.travelAllowance | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>Materiales</dt><dd>{{ service.materialsCost | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>Transporte</dt><dd>{{ service.transportCost | currency:'MXN':'symbol-narrow' }}</dd></div><div><dt>Gasolina</dt><dd>{{ service.gasolineCost | currency:'MXN':'symbol-narrow' }}</dd></div><div class="total"><dt>Total MXN</dt><dd>{{ total(service) | currency:'MXN':'symbol-narrow' }}</dd></div></dl>
+      @if (service.materials.length) { <h3>Materiales utilizados</h3><ul>@for (material of service.materials; track $index) { <li>{{ material.name }} · {{ material.cost | currency:'MXN':'symbol-narrow' }}</li> }</ul> }
+      <button type="button" class="button" (click)="selectedService = null">Cerrar detalle</button>
+    </dialog>
+  }
+</div>

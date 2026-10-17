@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import { RouterLink } from '@angular/router';
@@ -32,11 +33,15 @@ export class Gastos implements OnInit {
   error = '';
   fileError = '';
   success = '';
+  previewFile: DbExpense | null = null;
+  previewUrl = '';
+  previewPdf: SafeResourceUrl | null = null;
+  previewKind: 'pdf' | 'image' | 'unsupported' = 'unsupported';
   filterYear = '';
   filterMonth = '';
   filterAccount: number | null = null;
   filterCategory: string | null = null;
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: Db, private readonly sanitizer: DomSanitizer) {}
   ngOnInit(): void { this.load(); }
   get accountOptions() {
     const options = bankOptions(this.accounts);
@@ -93,7 +98,8 @@ export class Gastos implements OnInit {
     const cents = Math.round(Number(this.form.amount || 0) * 100);
     const rate = this.form.ivaMode === 'none' ? 0 : this.ivaRate;
     const subtotal = this.form.ivaMode === 'included' ? Math.round(cents / (1 + rate / 100)) : cents;
-    const iva = this.form.ivaMode === 'included' ? cents - subtotal : Math.round(subtotal * rate / 100);
+    const iva = this.form.ivaMode === 'custom' ? Math.round(Number(this.form.customIva || 0) * 100)
+      : this.form.ivaMode === 'included' ? cents - subtotal : Math.round(subtotal * rate / 100);
     return { subtotal: subtotal / 100, iva: iva / 100, total: (subtotal + iva) / 100 };
   }
   openModal(): void {
@@ -111,8 +117,9 @@ export class Gastos implements OnInit {
       this.form = { accountId: expense.accountId, cardId: expense.cardId, expenseDate: expense.expenseDate,
         billingMonth: expense.billingMonth, concept: expense.concept, category: expense.category, cfdiUse: expense.cfdiUse,
         amount: expense.ivaMode === 'included' ? expense.total : expense.subtotal, ivaMode: expense.ivaMode,
+        customIva: expense.ivaMode === 'custom' ? expense.iva : null,
         hasInvoice: expense.hasInvoice, ticket, invoice, createdBy: expense.createdBy };
-      if (expense.ivaMode !== 'none') this.ivaRate = expense.ivaRate;
+      if (expense.ivaMode === 'added' || expense.ivaMode === 'included') this.ivaRate = expense.ivaRate;
       this.editingExpense = expense; this.addingCategory = false; this.newCategory = ''; this.categoryError = '';
       this.isModalOpen = true;
     } catch (error) { this.error = this.message(error); }
@@ -167,6 +174,11 @@ export class Gastos implements OnInit {
   save(): void {
     if (this.saving || this.readingFiles) return;
     this.error = '';
+    if (this.form.ivaMode === 'custom' && (typeof this.form.customIva !== 'number' || !Number.isFinite(this.form.customIva)
+      || this.form.customIva < 0 || this.form.customIva > 999999999.99
+      || Math.abs(this.form.customIva * 100 - Math.round(this.form.customIva * 100)) > 0.0001)) {
+      this.error = 'Ingresa el IVA en pesos, mayor o igual a cero y con máximo dos decimales.'; return;
+    }
     if (!this.form.accountId || !this.form.expenseDate || !this.form.concept.trim() || !Number.isFinite(this.form.amount) || this.form.amount <= 0) {
       this.error = 'Completa la cuenta, fecha, concepto e importe positivo.'; return;
     }
@@ -193,6 +205,28 @@ export class Gastos implements OnInit {
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { this.error = this.message(error); }
+  }
+  previewInvoice(expense: DbExpense): void {
+    this.closeInvoicePreview(); this.error = '';
+    try {
+      const file = this.db.getExpenseAttachment(expense.id, 'invoice');
+      const bytes = Uint8Array.from(atob(file.data), char => char.charCodeAt(0));
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      const imageTypes: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+      if (extension === 'pdf') {
+        this.previewKind = 'pdf';
+        this.previewUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        this.previewPdf = this.sanitizer.bypassSecurityTrustResourceUrl(this.previewUrl);
+      } else if (imageTypes[extension]) {
+        this.previewKind = 'image';
+        this.previewUrl = URL.createObjectURL(new Blob([bytes], { type: imageTypes[extension] }));
+      }
+      this.previewFile = expense;
+    } catch (error) { this.closeInvoicePreview(); this.error = this.message(error); }
+  }
+  closeInvoicePreview(): void {
+    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+    this.previewFile = null; this.previewUrl = ''; this.previewPdf = null; this.previewKind = 'unsupported';
   }
   private load(): void {
     try { this.accounts = this.db.listBankAccounts(); this.expenses = this.db.listExpenses(); this.categories = this.db.listExpenseCategories(); this.ivaRate = this.db.getTaxSettings().ivaRate; }

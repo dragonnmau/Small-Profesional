@@ -29,6 +29,8 @@
             <line x1="100" x2="920" [attr.y1]="tick.y" [attr.y2]="tick.y" class="grid-line" />
             <text x="88" [attr.y]="tick.y + 4" text-anchor="end" class="axis-label">{{ axisLabel(tick.amount) }}</text>
           }
+          <line x1="100" x2="920" [attr.y1]="chart.goalY" [attr.y2]="chart.goalY" class="goal-line" />
+          <text x="912" [attr.y]="chart.goalY - 7" text-anchor="end" class="goal-label">Meta mensual · $15k</text>
           <polyline [attr.points]="chart.incomeLine" class="income-line" />
           <polyline [attr.points]="chart.expenseLine" class="expense-line" />
           @for (point of chart.points; track point.key; let index = $index) {
@@ -46,6 +48,98 @@
           <strong>{{ point.key }}</strong><span>Ingresos: {{ point.incomeCents / 100 | currency:'MXN':'symbol-narrow' }}</span><span>Egresos: {{ point.expenseCents / 100 | currency:'MXN':'symbol-narrow' }}</span>
         } @else { <span>Selecciona un punto de la gráfica para consultar sus importes.</span> }
       </div>
+    </section>
+    @let categoryChart = expenseCategoryChart;
+    <section class="panel category-panel" aria-labelledby="expense-categories-title">
+      <div class="section-heading"><div><h2 id="expense-categories-title">Desglose de gastos por categoría</h2><p>{{ periodLabel }} · Totales en MXN, incluido IVA</p></div><a routerLink="/gastos">Ver gastos</a></div>
+      @if (!categoryChart.count) {
+        <p class="empty" role="status">No hay gastos registrados en este periodo para desglosar por categoría.</p>
+      } @else {
+        @if (!categoryChart.totalCents) { <p class="empty" role="status">Los gastos del periodo tienen un total de cero.</p> }
+        <div class="category-charts">
+          <div class="category-distribution">
+            <h3>Distribución del gasto</h3>
+            <div class="donut-wrap">
+              <svg class="category-donut" viewBox="0 0 200 200" role="img" aria-labelledby="category-donut-title category-donut-description">
+                <title id="category-donut-title">Proporción de gastos por categoría</title>
+                <desc id="category-donut-description">{{ categoryChart.count }} gastos. Los importes y porcentajes de cada categoría se detallan junto al gráfico.</desc>
+                <circle class="donut-track" cx="100" cy="100" r="75" fill="none" stroke-width="24" />
+                @for (category of categoryChart.categories; track category.category) {
+                  @if (category.percentage > 0) {
+                    <circle cx="100" cy="100" r="75" fill="none" stroke-width="24" pathLength="100" transform="rotate(-90 100 100)"
+                      [attr.stroke]="category.color" [attr.stroke-dasharray]="category.percentage + ' ' + (100 - category.percentage)" [attr.stroke-dashoffset]="-category.offset">
+                      <title>{{ category.category }}: {{ category.totalCents / 100 | currency:'MXN':'symbol-narrow' }} ({{ category.percentage | number:'1.0-1' }}%)</title>
+                    </circle>
+                  }
+                }
+              </svg>
+              <div class="donut-total"><small>Total del periodo</small><strong>{{ categoryChart.totalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ categoryChart.count }} gastos · MXN</small></div>
+            </div>
+            <ul class="category-legend" aria-label="Porcentaje por categoría">
+              @for (category of categoryChart.categories; track category.category) {
+                <li><span><i [style.background]="category.color" aria-hidden="true"></i>{{ category.category }}</span><strong>{{ category.percentage | number:'1.0-1' }}%</strong></li>
+              }
+            </ul>
+          </div>
+          <div class="category-ranking">
+            <h3>Gastos de mayor a menor</h3><p class="ranking-note">Comparación del importe total por categoría.</p>
+            <ol class="category-bars" aria-label="Categorías ordenadas por importe total descendente">
+              @for (category of categoryChart.categories; track category.category) {
+                <li><div class="category-bar-heading"><span><i [style.background]="category.color" aria-hidden="true"></i>{{ category.category }}</span><strong>{{ category.totalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></div>
+                  <div class="category-bar-track" aria-hidden="true"><span [style.width.%]="category.barWidth" [style.background]="category.color"></span></div>
+                  <small>{{ category.count }} gastos · {{ category.percentage | number:'1.0-1' }}% del total</small>
+                </li>
+              }
+            </ol>
+          </div>
+        </div>
+      }
+    </section>
+    @let clientChart = incomeClientChart;
+    <section class="panel category-panel income-clients-panel" aria-labelledby="income-clients-title">
+      <div class="section-heading"><div><h2 id="income-clients-title">Desglose de ingresos por cliente</h2><p>{{ periodLabel }} · Pagos activos en MXN</p></div><a routerLink="/pagos">Ver ingresos</a></div>
+      @if (!clientChart.count) {
+        <p class="empty" role="status">No hay ingresos registrados en este periodo para desglosar por cliente.</p>
+      } @else {
+        @if (!clientChart.totalCents) { <p class="empty" role="status">Los ingresos del periodo tienen un total de cero.</p> }
+        <div class="category-charts">
+          <div class="category-distribution">
+            <h3>Distribución de ingresos</h3>
+            <div class="donut-wrap">
+              <svg class="category-donut" viewBox="0 0 200 200" role="img" aria-labelledby="client-donut-title client-donut-description">
+                <title id="client-donut-title">Proporción de ingresos por cliente</title>
+                <desc id="client-donut-description">{{ clientChart.count }} pagos activos. Los importes y porcentajes de cada cliente se detallan junto al gráfico.</desc>
+                <circle class="donut-track" cx="100" cy="100" r="75" fill="none" stroke-width="24" />
+                @for (client of clientChart.clients; track client.clientId) {
+                  @if (client.percentage > 0) {
+                    <circle cx="100" cy="100" r="75" fill="none" stroke-width="24" pathLength="100" transform="rotate(-90 100 100)"
+                      [attr.stroke]="client.color" [attr.stroke-dasharray]="client.percentage + ' ' + (100 - client.percentage)" [attr.stroke-dashoffset]="-client.offset">
+                      <title>{{ client.client }}: {{ client.totalCents / 100 | currency:'MXN':'symbol-narrow' }} ({{ client.percentage | number:'1.0-1' }}%)</title>
+                    </circle>
+                  }
+                }
+              </svg>
+              <div class="donut-total"><small>Total de ingresos</small><strong>{{ clientChart.totalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong><small>{{ clientChart.count }} pagos · MXN</small></div>
+            </div>
+            <ul class="category-legend" aria-label="Porcentaje de ingresos por cliente">
+              @for (client of clientChart.clients; track client.clientId) {
+                <li><span><i [style.background]="client.color" aria-hidden="true"></i>{{ client.client }}</span><strong>{{ client.percentage | number:'1.0-1' }}%</strong></li>
+              }
+            </ul>
+          </div>
+          <div class="category-ranking">
+            <h3>Ingresos de mayor a menor</h3><p class="ranking-note">Comparación del importe total recibido por cliente.</p>
+            <ol class="category-bars" aria-label="Clientes ordenados por ingresos descendentes">
+              @for (client of clientChart.clients; track client.clientId) {
+                <li><div class="category-bar-heading"><span><i [style.background]="client.color" aria-hidden="true"></i>{{ client.client }}</span><strong>{{ client.totalCents / 100 | currency:'MXN':'symbol-narrow' }}</strong></div>
+                  <div class="category-bar-track" aria-hidden="true"><span [style.width.%]="client.barWidth" [style.background]="client.color"></span></div>
+                  <small>{{ client.count }} pagos · {{ client.percentage | number:'1.0-1' }}% del total</small>
+                </li>
+              }
+            </ol>
+          </div>
+        </div>
+      }
     </section>
     <section class="panel" aria-labelledby="monthly-title">
       <div class="section-heading"><div><h2 id="monthly-title">Resumen por mes</h2><p>{{ periodLabel }}</p></div><nav aria-label="Consultar movimientos"><a routerLink="/pagos">Ver ingresos</a><a routerLink="/gastos">Ver gastos</a></nav></div>

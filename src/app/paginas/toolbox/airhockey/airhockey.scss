@@ -1,0 +1,20 @@
+:host { display:block; color:var(--p-text-color); }
+.hockey-page { max-width:850px; padding:1.5rem clamp(1rem,3vw,2rem); margin:auto; }
+.page-heading { text-align:center; margin-bottom:1.25rem; } .eyebrow { color:var(--p-primary-color); font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+h1 { margin:.4rem 0; font-size:2rem; } .page-heading p { margin:0; font-size:.85rem; color:var(--p-text-muted-color); }
+.game-shell { background:var(--p-content-background); border:1px solid var(--p-content-border-color); border-radius:16px; overflow:hidden; }
+.scoreboard { display:grid; grid-template-columns:1fr 1.2fr 1fr; gap:1rem; padding:1rem 1.5rem; align-items:center; border-bottom:1px solid var(--p-content-border-color); }
+.score { text-align:center; } .score>span { display:block; font-size:.8rem; font-weight:600; } .score>strong { display:block; font-size:2.25rem; line-height:1.2; margin:.35rem 0; } .player-score { color:#0284c7; } .machine-score { color:#e34f73; }
+.score-dots { display:flex; justify-content:center; gap:.35rem; } .score-dots i { width:.4rem; height:.4rem; border:1px solid currentColor; border-radius:50%; } .score-dots .filled { background:currentColor; }
+.match-label { display:flex; flex-direction:column; align-items:center; gap:.4rem; text-align:center; } .match-label>span { font-size:.6rem; letter-spacing:.12em; font-weight:700; color:var(--p-text-muted-color); } .match-label strong { font-size:1rem; } .match-label small { font-size:.7rem; color:var(--p-text-muted-color); }
+.rink-area { padding:1.25rem; background:radial-gradient(ellipse at center,#192e49,#080f1c); }
+.rink-frame { position:relative; width:min(100%,390px,48vh); aspect-ratio:3 / 4; margin:auto; border:2px solid #34516f; border-radius:16px; overflow:hidden; box-shadow:0 12px 40px #0006; }
+canvas { display:block; width:100%; height:100%; cursor:crosshair; touch-action:none; }
+.game-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:1rem; background:rgba(5,13,25,.82); color:#e2e8f0; text-align:center; }
+.game-overlay h2 { font-size:1.5rem; margin:.7rem 0; } .game-overlay p { font-size:.8rem; line-height:1.8; color:#a9bdd5; margin:0 0 1.25rem; } .overlay-icon { color:#38bdf8; font-size:2rem; }
+button { font:inherit; font-size:.8rem; border:1px solid var(--p-content-border-color); background:var(--p-content-background); color:var(--p-text-color); padding:.65rem 1rem; border-radius:7px; cursor:pointer; } button:disabled { opacity:.45; cursor:default; } button:hover:not(:disabled) { border-color:var(--p-primary-color); } .primary { background:#38bdf8; color:#082f49; border-color:#38bdf8; font-weight:700; }
+.game-status { margin:0; text-align:center; font-size:.8rem; padding:1rem .75rem .5rem; min-height:1.25rem; } .game-actions { display:flex; justify-content:center; gap:.6rem; padding:.5rem 1rem 1rem; }
+.serve-message { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:.65rem 1rem; border:1px solid #34516f; border-radius:8px; background:#0c192de8; color:#cbd5e1; white-space:nowrap; font-size:.8rem; pointer-events:none; }
+.instructions { display:flex; flex-wrap:wrap; justify-content:center; gap:1rem; padding:1rem 0; font-size:.72rem; color:var(--p-text-muted-color); } .instructions span { display:flex; align-items:center; gap:.4rem; }
+:focus-visible { outline:2px solid var(--p-primary-color); outline-offset:3px; } .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:500px) { .scoreboard { padding:1rem .75rem; gap:.5rem; } .rink-area { padding:.75rem; } .rink-frame { width:min(100%,390px); } .game-overlay h2 { font-size:1.25rem; } }
